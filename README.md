@@ -181,7 +181,9 @@ full 则在现有 sender→`rdma2dada`→unpack 链后复用同一个 `pipeline_
   unpack 采用 coordinator、固定 parser worker pool 和单 compute writer，并支持显式线程
   affinity。receive-only 与 unpack 已使用固定 CPU/NUMA、source port、ring/window 和
   1 秒 preparation 配置，分别通过 30 Gbps、60 秒、1 warm-up + 3 measured；35 Gbps
-  尚未通过。生产规模 Station→A、Power 与 coherency/Stokes 完整链已经通过；低错误率、
+  尚未通过。生产规模 1/2/4 parser 对照进一步证明 1 parser 不能维持该档速率，2/4
+  parsers 均通过，4 parsers 提供更高 P95 service headroom。生产规模 Station→A、Power
+  与 coherency/Stokes 完整链已经通过；低错误率、
   GPU-only 模块性能、阶段 P50/P95、利用率和额外 headroom 仍未完成。
 - `DumpToDada()` 仍是旧实现，不应用作 pipeline sink；性能 drain 使用
   `dada_dbnull -s -z`，只有需要物化检查数据时才使用 `dada_dbdisk`。

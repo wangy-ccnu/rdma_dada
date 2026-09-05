@@ -14,6 +14,12 @@ user's explicit approval. Each promoted item also retains the verified
 path, so the selected evidence remains externally traceable after runtime
 catalogs are cleaned or moved.
 
+Controlled experiment interpretations may be indexed by a dated Markdown file
+in this directory. Such a file must cite exact suite IDs and manifest hashes;
+it never replaces the catalog artifacts or imply promotion. The production
+unpack worker-count comparison is indexed in
+`unpack-worker-scaling-20260905.md`.
+
 ## Evidence adjudications
 
 `evidence-adjudications.json` records interpretation corrections without

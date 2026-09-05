@@ -94,7 +94,9 @@ requested or when promoting evidence for a paper claim.
    aggregate metrics required by the remaining comparisons.
 3. Complete the repository-owned GPU block writer, then run matched production
    Power/coherency `SYNCHRONOUS_DIRECT/1` versus `STAGED_PIPELINE/3` suites.
-4. Run the matched unpack 1/2/4 parser-worker comparison.
+4. The matched unpack 1/2/4 parser-worker comparison is complete and promoted:
+   one parser is a reproducible performance boundary, while two and four
+   parsers pass the nominal 30 Gb/s campaign.
 5. After the metric schema is frozen, rerun only the Full suites affected by
    the new instrumentation to collect P50/P95, utilization, headroom and the
    first saturated stage. Reuse unchanged receive/unpack acceptance evidence.
@@ -107,10 +109,10 @@ requested or when promoting evidence for a paper claim.
 | --- | --- | --- |
 | Observation/config identity/Project VDIF | `observation_config_test`, `resolved_observation_plan_test`, `config_identity_test`, `packet_format_config_test`, `project_vdif_v1_test`, `observation_artifacts_test`, `observation_config_compile_test` | Existing tests are individually useful, but need one three-repetition suite with exact binary/config identity and compact JSON output |
 | RDMA receive/raw-ring boundary | `rdma_receive_policy_test`; controller `receive` stage; matched 30 Gbps/60 s warm-up+3 suites `rdma2dada-30Gbps-60s-20260829T054121Z` (NSGE=2 exact closure) and `rdma2dada-30Gbps-60s-20260829T055947Z` (staged-copy effective performance failure with about 0.54% deficit); CQ/repost, CPU, copy bytes/time, publication latency and raw HWM retained | Remaining limitation is metric interpretation/plotting, not another placement data run; use the adjudication instead of the staged suite's historical runner PASS |
-| Parallel VDIF unpack | config/header/timeline/engine/ATFP/writer unit tests, `vdif_unpack_worker_integration_test`; 30 Gbps/60 s warm-up+3 formal PASS | Need three-repetition module-suite packaging plus parse/copy/raw-block service timing, process CPU usage and worker-count comparison |
+| Parallel VDIF unpack | config/header/timeline/engine/ATFP/writer unit tests, `vdif_unpack_worker_integration_test`; 30 Gbps/60 s warm-up+3 formal PASS; promoted 1/2/4 parser comparison with raw-block service P50/P95, process CPU cost and queue HWM | Remaining work is presentation of the accepted evidence; no worker-count rerun is required unless product behavior changes |
 | GPU format/beam/product/integration/transfer | CPU and CUDA tests for conversion, Beamform, Power, Stokes, integration and transfer; machine-readable CPU/CUDA coherency evidence reports shape/bytes, tolerances, max abs/rel error and NaN/Inf; production Full Power suite `full-30.2505Gbps-60s-20260829T033639Z` and Full coherency suite `full-30.2505Gbps-60s-20260829T075447Z` both passed warm-up+3 | Need the authoritative three-repetition module-suite packaging and GPU-only matched performance/utilization evidence. Stokes output remains `AA`, `BB`, `AB_REAL`, `AB_IMAG`; the reference also checks the derived I/Q/U/V equations without publishing separate arrays |
 | Result artifacts | `task8c_artifacts.py`, suite `preflight.json`, `summary.json`, `runs/*.json`, evidence logs and first-failure debug contract | CTest module tests do not yet have an equivalent compact suite controller; unpack comparison metrics are not yet complete |
-| Matched optimization comparison | versioned profiles, named experiments, worker CPU list, writer queue HWM/waits | No accepted worker-count 1/2/4 comparison exists. A one-worker coordinator/worker/writer run is not a serial-reference implementation and must be described as worker-count scaling |
+| Matched optimization comparison | versioned profiles, named experiments, worker CPU list, writer queue HWM/waits; accepted suites `unpack-30.2505Gbps-60s-20260905T084505Z`, `unpack-30.2505Gbps-60s-20260905T075730Z` and `unpack-30.2505Gbps-60s-20260905T081600Z` | Comparison is complete. It must be described as parser worker-count scaling, not as a serial-to-parallel implementation speedup |
 
 ## File Structure
 
@@ -481,11 +483,11 @@ If the selected formal rate is below 30 Gbps, state that lower rate as the repea
 - Consumes: one accepted unpack rate/profile and distinct CPUs on the verified NUMA node.
 - Produces: worker-count scaling results for 1, 2 and 4 parse/copy workers.
 
-- [ ] **Step 1: Freeze all non-worker variables**
+- [x] **Step 1: Freeze all non-worker variables**
 
 Keep hardware, build, source/config identities, sender input, duration, receiver settings, raw/compute ring geometry, window, reorder horizon, coordinator CPU, writer CPU, sink CPU and NUMA node identical. The only profile diff is the number/list of parser worker CPUs.
 
-- [ ] **Step 2: Run three named experiments**
+- [x] **Step 2: Run three named experiments**
 
 Use ordered mappings equivalent to:
 
@@ -497,13 +499,19 @@ Use ordered mappings equivalent to:
 
 Each experiment executes one warm-up plus three measured runs at the accepted unpack rate. A receiver count mismatch invalidates that repetition as an unpack comparison.
 
-- [ ] **Step 3: Report quantitative scaling**
+- [x] **Step 3: Report quantitative scaling**
 
 For each worker count report median/min/max sustained payload rate, records/s, parse/copy/raw-block service time, receiver/unpack loss accounting, ring occupancy, writer wait/HWM, total unpack CPU utilization and payload-copy/emitted bytes. Calculate service-time ratios only from matched accepted runs.
 
-- [ ] **Step 4: Bound the claim**
+- [x] **Step 4: Bound the claim**
 
 Describe the result as `parse/copy worker-count scaling`. Do not call it serial-to-parallel speedup because all three configurations retain coordinator, worker and single-writer stages. If the comparison cannot remain matched, document implementation evolution/optimization rationale only.
+
+Completed evidence is indexed by
+`docs/results/unpack-worker-scaling-20260905.md`. The 1-parser configuration
+completed warm-up plus three measured failure characterizations; the 2- and
+4-parser configurations completed the same repetition contract with exact
+closure.
 
 ### Task 9: Produce the Chapter 3 Paper Handoff
 

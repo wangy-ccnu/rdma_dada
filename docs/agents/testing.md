@@ -266,6 +266,13 @@ only to audit a cited raw line or diagnose a failure. The tracked
 with user approval. Promotion records evidence selection, not necessarily a
 product PASS.
 
+When a GPU/full run records raw utilization telemetry, each run JSON must
+SHA-link exactly the two bounded files
+`telemetry/<run-id>/gpu-telemetry-device.csv` and
+`telemetry/<run-id>/gpu-telemetry-process.log`, including byte counts. The
+catalog accepts only those declared files and rejects unreferenced telemetry;
+non-GPU suites do not need telemetry files.
+
 Remote result roots are retained until the user authorizes deletion. Maintain
 an inventory entry for every formal or diagnostic suite containing its purpose,
 topology/product mode, geometry, rate definitions, duration/repetitions,

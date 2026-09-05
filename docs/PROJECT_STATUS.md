@@ -56,7 +56,7 @@ Power fixture、多 CUDA stream、compute-ring CUDA 注册和 EOD 驱动的 work
 | --- | --- | --- | --- |
 | `fpga_sender_sim` | 已验收 | 多服务器模拟 Station；Project VDIF；source port；`sendmmsg`；定速及错误注入 | 用于重复速率和异常观测验收 |
 | `rdma2dada` | 30 Gbps 正式重复门禁已通过 | destination-only flow；1 QP/CQ/线程；NSGE=2 直接写 raw ring；固定 1 秒 drain | 保留 35 Gbps 未通过边界，后续只在接收实现变化时重跑正式基线 |
-| `vdif_unpack_worker` | 30 Gbps 正式重复门禁已通过 | coordinator + 固定 parser worker pool + 单 compute writer；有界队列和 window lease/ACK；Station→A、补零、partial/EOD | 完整 GPU 链复用已验收 profile，不重复把 unchanged ingest/unpack 当新模块测试 |
+| `vdif_unpack_worker` | 30 Gbps 正式重复门禁及 1/2/4 parser 对照已完成 | coordinator + 固定 parser worker pool + 单 compute writer；有界队列和 window lease/ACK；Station→A、补零、partial/EOD；2/4 parsers 通过，1 parser 稳定复现性能失败 | 生产基线至少使用 2 parsers；4 parsers 用于更高 P95 service headroom |
 | `pipeline_worker` | 469-Station Full Power 与 coherency/Stokes 约 30 Gbps 正式重复门禁均已通过；Power GPU-only direct/1 与 staged/3 匹配门禁也已通过 | 保留 `SYNCHRONOUS_DIRECT/1`；新增 1–4 个有界 staged slots，每 slot 独占 output pinned staging、device buffers、non-blocking stream 和事件；compute ring 由 CUDA 直接注册，单 writer 按 block sequence 写 output ring；读取以 compute-ring EOD 收口 | 后续明确实验为 coherency GPU-only 与高于 30 Gbps 的饱和点，不重复 Full 基线 |
 | 分阶段测试控制器 | full profile 集成及正式重复门禁已通过 | 支持 `receive`、`unpack`、`gpu`、`full`；full 继承 qths1 unpack profile，固定 CPU/NUMA、queue、ring/window、source port 和 1 秒 preparation；Full 汇总使用 sender aggregate payload rate | 保持通过配置为基线；只有实现或实验参数变化时才重跑相关拓扑 |
 | 测试结果 Catalog | 已完成服务器验收 | 原子导入 compact suite；确定性 JSON/CSV；按拓扑/速率/结果/日期/profile 查询；显式证据提升；测试任务只回传开发任务 | 开发任务维护汇总表；“总结成文”在更新论文时按需查询 |
@@ -70,7 +70,7 @@ Power fixture、多 CUDA stream、compute-ring CUDA 注册和 EOD 驱动的 work
 
 | 模块 | 输入 → 输出 | 状态 | 备注 |
 | --- | --- | --- | --- |
-| `vdif_unpack` | raw VDIF/TFP → payload-only ATFP/CI8 | 功能与约 30 Gbps 性能已正式验收 | CPU 并行解析、单 writer 保序发布；1/2/4 worker-count 对照仍待执行 |
+| `vdif_unpack` | raw VDIF/TFP → payload-only ATFP/CI8 | 功能、约 30 Gbps 性能及 1/2/4 worker-count 对照已正式验收 | 1 parser P95 service 28.38 ms 并丢失数据；2 parsers P95 11.24 ms/18.43% headroom；4 parsers P95 9.05 ms/47.09% headroom，单 writer 保序发布 |
 | `host_to_device` | host bytes → device bytes | 已验收 | 异步 CUDA copy，由 worker stream 调用 |
 | `complex_convert` | ATFP CI8/CI16 → TFPA CF32 | 已验收 | CUDA fused transpose/convert/scale；worker 第一版输入 CI8 |
 | `beamform` | TFPA CF32 + FPAB weights → TFPB CF32 | 已验收 | CPU oracle；CUDA FP32/TF32；NPY 权重；A→B |
@@ -92,6 +92,7 @@ Power fixture、多 CUDA stream、compute-ring CUDA 注册和 EOD 驱动的 work
 | 30 Gbps receive-only，60 s | 正式通过 | 1 warm-up + 3 measured；每轮 accepted=published=54,505,814，CQ/repost/长度错误为 0，固定端口、EOD、cleanup 通过 |
 | RDMA placement 对照，30 Gbps/60 s | 已完成 | `NSGE=2` direct suite `rdma2dada-30Gbps-60s-20260829T054121Z` 四轮精确闭合；staged-copy suite `rdma2dada-30Gbps-60s-20260829T055947Z` 四轮均出现约 0.54% receiver deficit，作为受控性能失败边界保留，并由 `evidence-adjudications.json` 覆盖旧 runner 的 PASS 判定 |
 | 30 Gbps receive + unpack，60 s | 正式通过 | 1 warm-up + 3 measured；固定 receiver CPU13、worker CPU14--19、sink CPU20、NUMA1、1 秒 preparation；sender/receiver/unpack/dbnull 精确闭合，missing/late/duplicate/header error 为 0 |
+| 469-Station unpack 1/2/4 parser 对照 | 已完成 | 60 s、1 warm-up + 3 measured 严格匹配；1 parser 四轮均 `PERFORMANCE_FAIL`，P95 service 中值 28.38 ms；2 parsers 通过，P95 11.24 ms/18.43% headroom；4 parsers 通过，P95 9.05 ms/47.09% headroom。详见 `docs/results/unpack-worker-scaling-20260905.md` |
 | Receiver 停止排空 | 已通过服务器验收 | 固定 1 秒 drain；四轮 drain 约 1.000 秒，期间 completion/repost 正常，`completions_after_stop=0` |
 | 35 Gbps unpack-only，60 s | 未通过 | receiver 接收量约为计划的一半；尚未证明 unpack 是首个饱和阶段 |
 | 完整 GPU pipeline 预算 | 已通过服务器验收 | 编译器报告双速率来源、20% deadline、逐级/合计传输和显存；RTX 3090 Release/CUDA 回归 3/3，30 Gbps 当前 deadline 11.184810 ms；不代表实时速率通过 |
@@ -104,7 +105,7 @@ Power fixture、多 CUDA stream、compute-ring CUDA 注册和 EOD 驱动的 work
 | 469-Station full coherency/Stokes | 正式通过 | suite `full-30.2505Gbps-60s-20260829T075447Z`；`A=469,F=2,P=2,B=350`、`STAGED_PIPELINE/3`、Beamform→Stokes→K128 MEAN；60 s、1 warm-up + 3 measured 全部 PASS/CLEANUP PASS，实际 sender aggregate 30.248563934–30.248563938 Gbps，sender/receiver/unpack/GPU/output/EOD 精确闭合；输出 `AA/BB/AB_REAL/AB_IMAG`，reference 另行核对 I/Q/U/V 推导 |
 | 约 500-Station 扩展实验 | 非当前门槛 | 当前论文生产主几何固定为 A=469；只有未来明确改变科学输入规模时才新增约 500-Station sender/权重/full 验收 |
 | 低错误率/长时间连续观测 | 待执行 | 错误率目标 0.001%–0.1%；还需 Station 失败、资源恢复和稳态验证 |
-| 论文第3章模块证据闭环 | 部分完成 | receive/unpack 正式基线已具备；仍需 GPU 模块 suite 收口、unpack 指标补齐及 1/2/4 worker 匹配比较 |
+| 论文第3章模块证据闭环 | 部分完成 | receive/unpack 正式基线、RDMA placement 和 unpack 1/2/4 parser 匹配对照已具备；后续缺口仅按第3章 backlog 处理，不再重复上述正式 suite |
 
 因此当前最准确的表述是：**30 Gbps receive-only、receive+unpack，以及生产几何
 Full Power（`A=469,F=4,P=1,B=350`）与 Full coherency/Stokes
@@ -158,8 +159,9 @@ coherency/Stokes 已由生产几何 Full 正式 suite 覆盖，不再重复执�
 
 1. Power GPU-only block writer、严格 header 契约、direct/1 对 staged/3 与各自饱和边界均已收口；
    coherency/Stokes 复用生产几何 Full 正式结果，不再单独运行 GPU-only。
-2. 为 unpack 增加低开销 active service、CPU、queue/ring HWM 指标，执行 1/2/4 parser
-   worker 受控比较；该比较称为 worker-count scaling，不称为串行到并行 speedup。
+2. unpack 的低开销 active service、CPU、queue/ring HWM 指标和 1/2/4 parser
+   worker 受控比较已经完成并写入 accepted evidence；该比较称为 worker-count scaling，
+   不称为串行到并行 speedup。
 3. 用统一 Chapter 3 module suite 打包现有 CPU/CUDA 数值门禁的三次重复、身份和误差字段。
 4. 未变化的 Full Power/coherency 与 receive/unpack 正式功能基线直接复用；只有后续产品
    行为发生实质变化时才重跑受影响拓扑。

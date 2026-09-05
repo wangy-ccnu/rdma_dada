@@ -1,7 +1,8 @@
 # VDIF ingest and ATFP unpack status
 
-Updated: 2026-08-28
-Committed baseline: `058f4bc`
+Updated: 2026-09-05
+Tested source manifest:
+`ce66a44396f870c2df229ef9ebe7e8ba518ef8b0830fe37ccdef07b1b75a4c06`
 
 This document records the current product boundary and performance evidence for
 `rdma2dada -> raw ring -> vdif_unpack_worker -> compute ring`. It deliberately
@@ -43,12 +44,12 @@ not the product contract.
 
 ## Measured geometry
 
-The latest campaign uses:
+The production A469 campaign uses:
 
 - Project VDIF record: 4,128 bytes = 32-byte header + 4,096-byte payload;
-- raw block: 52,838,400 bytes = 12,800 records;
-- compute block: 52,428,800 bytes;
-- block arrival interval at 30 Gbps payload: approximately 14 ms.
+- raw block: 50,336,832 bytes = 12,194 records;
+- compute block: 49,946,624 bytes;
+- planned raw-block arrival interval at the nominal 30 Gb/s point: 13.312 ms.
 
 Window blocks and reorder horizon are derived from requested rate,
 `missing_wait_ms`, Station-skew reserve and block geometry. Ring/window capacity
@@ -73,11 +74,28 @@ is burst tolerance; it is not evidence of sufficient steady-state service rate.
   CPUs 14--19, sink CPU 20, NUMA1, WR depth 1024, poll batch 32, source ports,
   ring/window geometry and one-second preparation.
 
+### Parser-worker scaling
+
+A matched production `A=469,F=4,P=1` comparison held the complete receiver,
+ring, sender, duration and placement profile fixed and changed only the parser
+worker count. One parser failed all warm-up/measured repetitions; its measured
+median P95 raw-block service time was 28.38 ms versus the 13.312 ms planned
+arrival interval, with a median 26,175,187-record deficit. Two and four parsers
+both completed one warm-up plus three measured runs with exact closure.
+
+The two-parser median P95 service time/capacity/headroom was
+11.24 ms / 35.83 Gb/s / 18.43%. Four parsers improved these to
+9.05 ms / 44.50 Gb/s / 47.09%, while increasing CPU cost from 0.6446 to
+0.8501 CPU seconds per payload GB. Exact suite identities and the full table
+are recorded in
+[`results/unpack-worker-scaling-20260905.md`](results/unpack-worker-scaling-20260905.md).
+
 ### Remaining limits
 
-- 35 Gbps/60 s failed with receiver delivery far below the planned record
-  count; available evidence does not identify unpack as the first saturated
-  stage;
+- the 1-parser production configuration is a reproducible unpack/raw-ring
+  backpressure boundary and is not an accepted operating profile;
+- 35 Gbps/60 s historical evidence does not by itself identify unpack as the
+  first saturated stage;
 - all current rate results stop at `dada_dbnull` on the compute ring and exclude
   `pipeline_worker`, H2D, GPU algorithms, D2H and output ring.
 

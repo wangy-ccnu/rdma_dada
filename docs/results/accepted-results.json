@@ -483,6 +483,245 @@
         "suite_id": "gpu-90Gbps-60s-20260830T104917Z"
       },
       "promoted_utc": "2026-08-30T11:11:48Z"
+    },
+    {
+      "catalog_entry": {
+        "actual_payload_gbps": {
+          "maximum": 30.248563941,
+          "median": 30.248563939,
+          "minimum": 30.248563937
+        },
+        "cleanup_result": "PASS",
+        "configuration": {
+          "gpu_worker_cpu": null,
+          "ingress_numa_node": null,
+          "numa_node": 1,
+          "processing_numa_node": null,
+          "receiver_poll_batch": 32,
+          "receiver_poll_cpu": 13,
+          "receiver_wr_num": 1024,
+          "reorder_horizon_groups": 416,
+          "rings": {
+            "compute": {
+              "block_bytes": 49946624,
+              "blocks": 8
+            },
+            "output": null,
+            "raw": {
+              "block_bytes": 50336832,
+              "blocks": 16
+            }
+          },
+          "sink_cpu_list": "20",
+          "unpack_start_delay_seconds": 1,
+          "window_groups": null,
+          "worker_cpu_list": "14,15,16,19"
+        },
+        "duration_seconds": 60.0,
+        "first_failure": null,
+        "identity": {
+          "baseline_profile_id": "qths1-unpack-30p2505gbps-60s-a469-v1",
+          "baseline_profile_sha256": "f25d3a017d10544fc8b84303b9cf7778b50d2828237618894dd97b4a51db3a5f",
+          "binary_sha256": {
+            "qths1:dada_db": "61b1a6a92f8f45b07fc760868aee59f683511ffa331ba80b62306466a7d5e1a4",
+            "qths1:dada_dbnull": "fbe083b4fdc775e0b3e4513c1c150a1e73e7475164beef83487823b8ba13bcbc",
+            "qths1:ethtool": "7c04ff79c2ef3c0f72fcecd958203c8b407db7d68bbe76cbf890c1e9656d461c",
+            "qths1:rdma2dada": "bcae518f9f335fc64de3ae3df68866349dbe5568c722b1b5bc8ec6e128653ea0",
+            "qths1:vdif_unpack_worker": "03756f773c5be6567e22a418eedeb03410bcd7aa14e4b241c5fdb950faebf1b7",
+            "qtpulsar1:ethtool": "7c04ff79c2ef3c0f72fcecd958203c8b407db7d68bbe76cbf890c1e9656d461c",
+            "qtpulsar1:fpga_sender_sim": "c804811ccf1cbdfaf348940f42abda1239dd8629bb469920638399fa714bb821",
+            "qtpulsar2:ethtool": "7c04ff79c2ef3c0f72fcecd958203c8b407db7d68bbe76cbf890c1e9656d461c",
+            "qtpulsar2:fpga_sender_sim": "c804811ccf1cbdfaf348940f42abda1239dd8629bb469920638399fa714bb821"
+          },
+          "config_id": "f36b23bc69021ab1a4530a1051714bce8c58fa999788e5d1705c4523440e9428",
+          "geometry_id": "f04e97fd3bd66ecf0e1cb4ee53da8dbc14e6c6550cf7005ebf17cc025dc0aa9e",
+          "source_manifest_sha256": "ce66a44396f870c2df229ef9ebe7e8ba518ef8b0830fe37ccdef07b1b75a4c06"
+        },
+        "measured_count": 3,
+        "modules": [
+          "rdma2dada",
+          "vdif_unpack_worker",
+          "dada_dbnull"
+        ],
+        "result_path": "suites/unpack-30.2505Gbps-60s-20260905T075730Z",
+        "started_utc": "2026-09-05T07:57:35.823059Z",
+        "suite_id": "unpack-30.2505Gbps-60s-20260905T075730Z",
+        "suite_manifest_sha256": "a9ebe2fdce11980992f08e44db2b9fbca602870d4240ad09b4434ca4afb3647a",
+        "summary_sha256": "8fe63d50e543e9e140d88d366feffdde060114e21b33b7294b3f0ab8328b2a9e",
+        "target_payload_gbps": 30.2505,
+        "test_result": "PASS",
+        "test_topology": "unpack",
+        "warmup_count": 1
+      },
+      "origin": {
+        "imported_utc": "2026-09-05T08:40:17Z",
+        "remote_suite_root": "/home/user/wy/task8c-multistation-unpack-workers-2-results/unpack-30.2505Gbps-60s-20260905T075730Z",
+        "schema_version": 1,
+        "source_host": "qths1",
+        "source_manifest_sha256": "ce66a44396f870c2df229ef9ebe7e8ba518ef8b0830fe37ccdef07b1b75a4c06",
+        "suite_id": "unpack-30.2505Gbps-60s-20260905T075730Z"
+      },
+      "promoted_utc": "2026-09-05T09:26:31Z"
+    },
+    {
+      "catalog_entry": {
+        "actual_payload_gbps": {
+          "maximum": 30.248563939,
+          "median": 30.248563939,
+          "minimum": 30.248563933
+        },
+        "cleanup_result": "PASS",
+        "configuration": {
+          "gpu_worker_cpu": null,
+          "ingress_numa_node": null,
+          "numa_node": 1,
+          "processing_numa_node": null,
+          "receiver_poll_batch": 32,
+          "receiver_poll_cpu": 13,
+          "receiver_wr_num": 1024,
+          "reorder_horizon_groups": 416,
+          "rings": {
+            "compute": {
+              "block_bytes": 49946624,
+              "blocks": 8
+            },
+            "output": null,
+            "raw": {
+              "block_bytes": 50336832,
+              "blocks": 16
+            }
+          },
+          "sink_cpu_list": "20",
+          "unpack_start_delay_seconds": 1,
+          "window_groups": null,
+          "worker_cpu_list": "14,15,16,17,18,19"
+        },
+        "duration_seconds": 60.0,
+        "first_failure": null,
+        "identity": {
+          "baseline_profile_id": "qths1-unpack-30p2505gbps-60s-a469-v1",
+          "baseline_profile_sha256": "f25d3a017d10544fc8b84303b9cf7778b50d2828237618894dd97b4a51db3a5f",
+          "binary_sha256": {
+            "qths1:dada_db": "61b1a6a92f8f45b07fc760868aee59f683511ffa331ba80b62306466a7d5e1a4",
+            "qths1:dada_dbnull": "fbe083b4fdc775e0b3e4513c1c150a1e73e7475164beef83487823b8ba13bcbc",
+            "qths1:ethtool": "7c04ff79c2ef3c0f72fcecd958203c8b407db7d68bbe76cbf890c1e9656d461c",
+            "qths1:rdma2dada": "bcae518f9f335fc64de3ae3df68866349dbe5568c722b1b5bc8ec6e128653ea0",
+            "qths1:vdif_unpack_worker": "03756f773c5be6567e22a418eedeb03410bcd7aa14e4b241c5fdb950faebf1b7",
+            "qtpulsar1:ethtool": "7c04ff79c2ef3c0f72fcecd958203c8b407db7d68bbe76cbf890c1e9656d461c",
+            "qtpulsar1:fpga_sender_sim": "c804811ccf1cbdfaf348940f42abda1239dd8629bb469920638399fa714bb821",
+            "qtpulsar2:ethtool": "7c04ff79c2ef3c0f72fcecd958203c8b407db7d68bbe76cbf890c1e9656d461c",
+            "qtpulsar2:fpga_sender_sim": "c804811ccf1cbdfaf348940f42abda1239dd8629bb469920638399fa714bb821"
+          },
+          "config_id": "fa24c52f7afa48a74d4253c215a6a4c75a29e981fda4d456eb92747827a2fa6c",
+          "geometry_id": "f04e97fd3bd66ecf0e1cb4ee53da8dbc14e6c6550cf7005ebf17cc025dc0aa9e",
+          "source_manifest_sha256": "ce66a44396f870c2df229ef9ebe7e8ba518ef8b0830fe37ccdef07b1b75a4c06"
+        },
+        "measured_count": 3,
+        "modules": [
+          "rdma2dada",
+          "vdif_unpack_worker",
+          "dada_dbnull"
+        ],
+        "result_path": "suites/unpack-30.2505Gbps-60s-20260905T081600Z",
+        "started_utc": "2026-09-05T08:16:06.322821Z",
+        "suite_id": "unpack-30.2505Gbps-60s-20260905T081600Z",
+        "suite_manifest_sha256": "9f2aea037f4c4c7d1ccaa46632d2943ffc56f6f348c8b054aca21d67fe9381d2",
+        "summary_sha256": "8e88602c2d7182002933c62327031a1e85820e0e8c80b4da3437bf10c95f6faf",
+        "target_payload_gbps": 30.2505,
+        "test_result": "PASS",
+        "test_topology": "unpack",
+        "warmup_count": 1
+      },
+      "origin": {
+        "imported_utc": "2026-09-05T08:40:17Z",
+        "remote_suite_root": "/home/user/wy/task8c-multistation-unpack-workers-4-results/unpack-30.2505Gbps-60s-20260905T081600Z",
+        "schema_version": 1,
+        "source_host": "qths1",
+        "source_manifest_sha256": "ce66a44396f870c2df229ef9ebe7e8ba518ef8b0830fe37ccdef07b1b75a4c06",
+        "suite_id": "unpack-30.2505Gbps-60s-20260905T081600Z"
+      },
+      "promoted_utc": "2026-09-05T09:26:31Z"
+    },
+    {
+      "catalog_entry": {
+        "actual_payload_gbps": null,
+        "cleanup_result": "PASS",
+        "configuration": {
+          "gpu_worker_cpu": null,
+          "ingress_numa_node": null,
+          "numa_node": 1,
+          "processing_numa_node": null,
+          "receiver_poll_batch": 32,
+          "receiver_poll_cpu": 13,
+          "receiver_wr_num": 1024,
+          "reorder_horizon_groups": 416,
+          "rings": {
+            "compute": {
+              "block_bytes": 49946624,
+              "blocks": 8
+            },
+            "output": null,
+            "raw": {
+              "block_bytes": 50336832,
+              "blocks": 16
+            }
+          },
+          "sink_cpu_list": "20",
+          "unpack_start_delay_seconds": 1,
+          "window_groups": null,
+          "worker_cpu_list": "14,15,19"
+        },
+        "duration_seconds": 60.0,
+        "first_failure": {
+          "classification": "PERFORMANCE_FAIL",
+          "exit_code": 1,
+          "message": "[{\"actual\": {\"accepted\": 29449533, \"published\": 29449533}, \"expected\": \"accepted=published in [54957420,55873377]\", \"field\": \"receiver.preparation_range\"}, {\"actual\": 28533576, \"expected\": 54957420, \"field\": \"unpack.records\"}, {\"actual\": 28533576, \"expected\": 54957420, \"field\": \"unpack.accepted\"}, {\"actual\": 50948, \"expected\": 117180, \"field\": \"unpack.complete_groups\"}, {\"actual\": 66232, \"expected\": 0, \"field\": \"unpack.incomplete_groups\"}, {\"actual\": 46479, \"expected\": 0, \"field\": \"unpack.fully_missing_groups\"}, {\"actual\": 26423844, \"expected\": 0, \"field\": \"unpack.missing_station\"}]",
+          "run_id": "warmup-01",
+          "stage": "COLLECTING"
+        },
+        "identity": {
+          "baseline_profile_id": "qths1-unpack-30p2505gbps-60s-a469-v1",
+          "baseline_profile_sha256": "f25d3a017d10544fc8b84303b9cf7778b50d2828237618894dd97b4a51db3a5f",
+          "binary_sha256": {
+            "qths1:dada_db": "61b1a6a92f8f45b07fc760868aee59f683511ffa331ba80b62306466a7d5e1a4",
+            "qths1:dada_dbnull": "fbe083b4fdc775e0b3e4513c1c150a1e73e7475164beef83487823b8ba13bcbc",
+            "qths1:ethtool": "7c04ff79c2ef3c0f72fcecd958203c8b407db7d68bbe76cbf890c1e9656d461c",
+            "qths1:rdma2dada": "bcae518f9f335fc64de3ae3df68866349dbe5568c722b1b5bc8ec6e128653ea0",
+            "qths1:vdif_unpack_worker": "03756f773c5be6567e22a418eedeb03410bcd7aa14e4b241c5fdb950faebf1b7",
+            "qtpulsar1:ethtool": "7c04ff79c2ef3c0f72fcecd958203c8b407db7d68bbe76cbf890c1e9656d461c",
+            "qtpulsar1:fpga_sender_sim": "c804811ccf1cbdfaf348940f42abda1239dd8629bb469920638399fa714bb821",
+            "qtpulsar2:ethtool": "7c04ff79c2ef3c0f72fcecd958203c8b407db7d68bbe76cbf890c1e9656d461c",
+            "qtpulsar2:fpga_sender_sim": "c804811ccf1cbdfaf348940f42abda1239dd8629bb469920638399fa714bb821"
+          },
+          "config_id": "e3dc8667487a63b77e7e6d3f944d1dc62bb732be1d2b82baba632b188899c4ad",
+          "geometry_id": "f04e97fd3bd66ecf0e1cb4ee53da8dbc14e6c6550cf7005ebf17cc025dc0aa9e",
+          "source_manifest_sha256": "ce66a44396f870c2df229ef9ebe7e8ba518ef8b0830fe37ccdef07b1b75a4c06"
+        },
+        "measured_count": 3,
+        "modules": [
+          "rdma2dada",
+          "vdif_unpack_worker",
+          "dada_dbnull"
+        ],
+        "result_path": "suites/unpack-30.2505Gbps-60s-20260905T084505Z",
+        "started_utc": "2026-09-05T08:45:11.486463Z",
+        "suite_id": "unpack-30.2505Gbps-60s-20260905T084505Z",
+        "suite_manifest_sha256": "fcd275e21f588d792d88483111048a978e8c50c0b119d12e2a9b964a3e026322",
+        "summary_sha256": "21833e1fa66a8725dab34312b2d55c7c5ce960cb728121b2c930b66448879e48",
+        "target_payload_gbps": 30.2505,
+        "test_result": "PERFORMANCE_FAIL",
+        "test_topology": "unpack",
+        "warmup_count": 1
+      },
+      "origin": {
+        "imported_utc": "2026-09-05T09:07:19Z",
+        "remote_suite_root": "/home/user/wy/task8c-multistation-unpack-workers-1-characterization-results/unpack-30.2505Gbps-60s-20260905T084505Z",
+        "schema_version": 1,
+        "source_host": "qths1",
+        "source_manifest_sha256": "ce66a44396f870c2df229ef9ebe7e8ba518ef8b0830fe37ccdef07b1b75a4c06",
+        "suite_id": "unpack-30.2505Gbps-60s-20260905T084505Z"
+      },
+      "promoted_utc": "2026-09-05T09:26:31Z"
     }
   ],
   "schema_version": 1
