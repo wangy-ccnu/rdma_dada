@@ -348,6 +348,54 @@ class CatalogTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "compact suite file set"):
                 catalog.validate_suite(suite)
 
+    def test_validate_accepts_sha_linked_gpu_telemetry_artifacts_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = pathlib.Path(directory)
+            suite = make_suite_fixture(base / "source", topology="gpu")
+            telemetry = suite / "telemetry" / "measured-01"
+            telemetry.mkdir(parents=True)
+            device = telemetry / "gpu-telemetry-device.csv"
+            process = telemetry / "gpu-telemetry-process.log"
+            device.write_text("20260904, 12:00:01, 0, 100\n")
+            process.write_text("20260904 12:00:01 0 4321 C 80\n")
+            run_path = suite / "runs" / "measured-01.json"
+            run = json.loads(run_path.read_text())
+            run["statistics"]["gpu_telemetry"] = {
+                "backend": "nvidia-smi-dmon-pmon",
+                "raw_files": [
+                    {
+                        "path": str(device.relative_to(suite)),
+                        "sha256": hashlib.sha256(device.read_bytes()).hexdigest(),
+                        "bytes": device.stat().st_size,
+                    },
+                    {
+                        "path": str(process.relative_to(suite)),
+                        "sha256": hashlib.sha256(process.read_bytes()).hexdigest(),
+                        "bytes": process.stat().st_size,
+                    },
+                ],
+            }
+            run_path.write_text(json.dumps(run) + "\n")
+            task8c_artifacts.write_manifest(suite)
+
+            loaded = catalog.validate_suite(suite)
+            self.assertEqual(len(loaded["runs"]), 1)
+
+            extra = telemetry / "unreferenced.log"
+            extra.write_text("must be rejected\n")
+            task8c_artifacts.write_manifest(suite)
+            with self.assertRaisesRegex(ValueError, "compact suite file set"):
+                catalog.validate_suite(suite)
+
+            extra.unlink()
+            run["statistics"]["gpu_telemetry"]["raw_files"][0][
+                "sha256"
+            ] = "0" * 64
+            run_path.write_text(json.dumps(run) + "\n")
+            task8c_artifacts.write_manifest(suite)
+            with self.assertRaisesRegex(ValueError, "telemetry SHA256"):
+                catalog.validate_suite(suite)
+
     def test_failure_requires_structured_failure_and_debug_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
             base = pathlib.Path(directory)

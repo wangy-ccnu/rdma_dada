@@ -616,6 +616,16 @@ class RatePlan:
                 for name, contents in self.artifact_files.items()
             },
         })
+        if self.uses_unpack_worker and self.worker_cpu_list is not None:
+            unpack_cpus = [
+                int(value) for value in self.worker_cpu_list.split(",")
+            ]
+            result["unpack_threading"] = {
+                "coordinator_cpu": unpack_cpus[0],
+                "parser_worker_cpus": unpack_cpus[1:-1],
+                "parser_worker_count": len(unpack_cpus) - 2,
+                "writer_cpu": unpack_cpus[-1],
+            }
         if self.pipeline_stage == "receive":
             result.pop("compute_key", None)
             result.pop("compute_block_bytes", None)
@@ -1258,6 +1268,7 @@ import signal
 import socket
 import subprocess
 import sys
+import time
 
 if len(sys.argv) < 3:
     raise SystemExit("usage: supervise.py EXIT_PATH COMMAND [ARG ...]")
@@ -1284,13 +1295,17 @@ def write(value):
 def forward(signum, _frame):
     global pending_signal
     pending_signal = signum
-    if child is not None and child.poll() is None:
-        child.send_signal(signum)
+    if child is not None:
+        try:
+            os.kill(child.pid, signum)
+        except ProcessLookupError:
+            pass
 
 
 signal.signal(signal.SIGTERM, forward)
 signal.signal(signal.SIGINT, forward)
 started = now()
+started_monotonic_ns = time.monotonic_ns()
 child = subprocess.Popen(argv)
 child_pid_path.write_text(str(child.pid) + "\\n")
 allowed_env = {
@@ -1321,15 +1336,29 @@ record = {
     "state": "RUNNING",
 }
 write(record)
-if pending_signal is not None and child.poll() is None:
-    child.send_signal(pending_signal)
-return_code = child.wait()
-exit_code = return_code if return_code >= 0 else 128 - return_code
+if pending_signal is not None:
+    try:
+        os.kill(child.pid, pending_signal)
+    except ProcessLookupError:
+        pass
+_, wait_status, usage = os.wait4(child.pid, 0)
+if os.WIFEXITED(wait_status):
+    exit_code = os.WEXITSTATUS(wait_status)
+elif os.WIFSIGNALED(wait_status):
+    exit_code = 128 + os.WTERMSIG(wait_status)
+else:
+    exit_code = 1
 exit_path.write_text(str(exit_code) + "\\n")
+user_cpu_ns = int(round(usage.ru_utime * 1_000_000_000))
+system_cpu_ns = int(round(usage.ru_stime * 1_000_000_000))
 record.update({
     "ended_utc": now(),
     "returncode": exit_code,
     "state": "EXITED",
+    "elapsed_ns": time.monotonic_ns() - started_monotonic_ns,
+    "user_cpu_ns": user_cpu_ns,
+    "system_cpu_ns": system_cpu_ns,
+    "cpu_time_ns": user_cpu_ns + system_cpu_ns,
 })
 write(record)
 raise SystemExit(exit_code)
@@ -3111,7 +3140,11 @@ class SshBackend:
                 pipeline_worker_log,
                 expect_pipeline_worker=plan.uses_pipeline_worker,
                 expect_missing_per_second=plan.unpack_missing_per_second,
+                worker_process=json.loads(
+                    (qths_copy / "worker.process.json").read_text()
+                ),
             )
+            _annotate_unpack_performance(statistics["unpack"], plan)
         if plan.uses_pipeline_worker:
             statistics.setdefault("gpu", {})["metrics"] = json.loads(
                 (qths_copy / "pipeline-worker-metrics.json").read_text()
@@ -3897,6 +3930,112 @@ def parse_receive_statistics(
     }
 
 
+def _annotate_unpack_performance(
+    unpack: dict[str, Any], plan: RatePlan
+) -> None:
+    service_p95_ns = int(unpack["raw_block_service_ns_p95"])
+    queue_high_watermark = int(unpack["writer_queue_high_watermark"])
+    queue_capacity = int(unpack["writer_queue_capacity"])
+    if service_p95_ns <= 0 or queue_capacity <= 0:
+        raise StageError(
+            "COLLECTING", ["validate", "unpack-performance-metrics"], 1,
+            json.dumps(unpack, sort_keys=True),
+            "unpack service P95 and writer queue capacity must be positive",
+            "HARNESS_FAIL",
+        )
+    planned_interval_ns = (
+        plan.raw_block_bytes * 8 / plan.aggregate_gbps
+    )
+    service_capacity_gbps = (
+        plan.raw_block_bytes * 8 / service_p95_ns
+    )
+    unpack["performance"] = {
+        "planned_raw_block_interval_ns": planned_interval_ns,
+        "service_capacity_gbps_at_p95": service_capacity_gbps,
+        "service_headroom_ratio_at_p95": (
+            service_capacity_gbps / plan.aggregate_gbps - 1.0
+        ),
+        "writer_queue_high_watermark_ratio": (
+            queue_high_watermark / queue_capacity
+        ),
+    }
+
+
+def _validate_unpack_observability_metrics(unpack: dict[str, Any]) -> None:
+    mismatches: list[dict[str, Any]] = []
+    for left, right in (
+        ("emitted_blocks", "writer_acquire_calls"),
+        ("emitted_blocks", "writer_commit_calls"),
+        ("emitted_blocks", "writer_committed_blocks"),
+        ("emitted_bytes", "writer_committed_bytes"),
+    ):
+        if unpack[left] != unpack[right]:
+            mismatches.append({
+                "field": f"unpack.{right}",
+                "expected": unpack[left],
+                "actual": unpack[right],
+            })
+    queue_capacity = unpack["writer_queue_capacity"]
+    queue_high_watermark = unpack["writer_queue_high_watermark"]
+    if (
+        queue_capacity <= 0
+        or queue_high_watermark < 0
+        or queue_high_watermark > queue_capacity
+    ):
+        mismatches.append({
+            "field": "unpack.writer_queue_high_watermark",
+            "expected": f"in [0, {queue_capacity}] with positive capacity",
+            "actual": queue_high_watermark,
+        })
+    quantization_ns = unpack["timing_quantization_ns"]
+    if quantization_ns <= 0:
+        mismatches.append({
+            "field": "unpack.timing_quantization_ns",
+            "expected": "> 0",
+            "actual": quantization_ns,
+        })
+    for prefix in ("raw_block_service", "raw_block_arrival_interval"):
+        count = unpack[f"{prefix}_samples"]
+        total = unpack[f"{prefix}_ns_total"]
+        maximum = unpack[f"{prefix}_ns_max"]
+        p50 = unpack[f"{prefix}_ns_p50"]
+        p95 = unpack[f"{prefix}_ns_p95"]
+        valid = (
+            count >= 0
+            and (
+                total == maximum == p50 == p95 == 0
+                if count == 0
+                else total >= maximum > 0
+                and 0 < p50 <= p95 <= maximum + quantization_ns
+            )
+        )
+        if not valid:
+            mismatches.append({
+                "field": f"unpack.{prefix}",
+                "expected": "internally consistent count/total/max/P50/P95",
+                "actual": {
+                    "count": count, "total_ns": total, "max_ns": maximum,
+                    "p50_ns": p50, "p95_ns": p95,
+                },
+            })
+    if (
+        unpack["raw_block_service_samples"] > 0
+        and unpack["raw_block_arrival_interval_samples"] + 1
+        != unpack["raw_block_service_samples"]
+    ):
+        mismatches.append({
+            "field": "unpack.raw_block_arrival_interval_samples",
+            "expected": unpack["raw_block_service_samples"] - 1,
+            "actual": unpack["raw_block_arrival_interval_samples"],
+        })
+    if mismatches:
+        raise StageError(
+            "COLLECTING", ["validate", "unpack-observability-metrics"], 1,
+            json.dumps(unpack, sort_keys=True),
+            json.dumps(mismatches, sort_keys=True), "HARNESS_FAIL",
+        )
+
+
 def parse_qths_statistics(
     receiver_log: str,
     worker_log: str,
@@ -3904,6 +4043,7 @@ def parse_qths_statistics(
     pipeline_worker_log: str = "",
     expect_pipeline_worker: bool = True,
     expect_missing_per_second: bool = False,
+    worker_process: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     receiver = _parse_receiver_statistics(receiver_log)
     unpack_match = re.search(
@@ -3945,19 +4085,35 @@ def parse_qths_statistics(
         r"max_consecutive_station_records=(\d+)",
         worker_log,
     )
+    unpack_performance_match = re.search(
+        r"payload_copies=(\d+)/(\d+)\s+"
+        r"emitted_blocks=(\d+)\s+emitted_bytes=(\d+)\s+"
+        r"writer_acquire=(\d+)\s+commit=(\d+)\s+blocks=(\d+)\s+"
+        r"bytes=(\d+)\s+acquire_wait_ns=(\d+)\s+"
+        r"writer_queue_hwm=(\d+)\s+writer_queue_capacity=(\d+)\s+"
+        r"writer_enqueue_wait_ns=(\d+)\s+"
+        r"raw_block_service=(\d+)/(\d+)/(\d+)/(\d+)/(\d+)\s+"
+        r"raw_block_arrival=(\d+)/(\d+)/(\d+)/(\d+)/(\d+)\s+"
+        r"timing_quantization_ns=(\d+)",
+        worker_log,
+    )
     station_matches = re.findall(
         r"VDIF unpack station statistics:\s*antenna=(\d+)\s+"
         r"station=(\d+)\s+observed=(\d+)\s+accepted=(\d+)\s+"
         r"late=(\d+)\s+highest_ordinal=(\d+)",
         worker_log,
     )
-    if not unpack_diagnostics_match or not station_matches:
+    if (
+        not unpack_diagnostics_match
+        or not unpack_performance_match
+        or not station_matches
+    ):
         raise StageError(
             "COLLECTING",
             ["parse", "worker.log"],
             1,
             worker_log,
-            "missing unpack skew or per-Station diagnostics",
+            "missing unpack performance, skew or per-Station diagnostics",
         )
     summary_section = "output" if expect_pipeline_worker else "compute"
     summary_filename = f"{summary_section}-summary.json"
@@ -4008,6 +4164,73 @@ def parse_qths_statistics(
             )
         }
     )
+    performance_names = (
+        "payload_copy_calls",
+        "payload_copy_bytes",
+        "emitted_blocks",
+        "emitted_bytes",
+        "writer_acquire_calls",
+        "writer_commit_calls",
+        "writer_committed_blocks",
+        "writer_committed_bytes",
+        "writer_acquire_wait_ns",
+        "writer_queue_high_watermark",
+        "writer_queue_capacity",
+        "writer_enqueue_wait_ns",
+        "raw_block_service_samples",
+        "raw_block_service_ns_total",
+        "raw_block_service_ns_max",
+        "raw_block_service_ns_p50",
+        "raw_block_service_ns_p95",
+        "raw_block_arrival_interval_samples",
+        "raw_block_arrival_interval_ns_total",
+        "raw_block_arrival_interval_ns_max",
+        "raw_block_arrival_interval_ns_p50",
+        "raw_block_arrival_interval_ns_p95",
+        "timing_quantization_ns",
+    )
+    unpack.update({
+        name: int(value)
+        for name, value in zip(
+            performance_names, unpack_performance_match.groups()
+        )
+    })
+    _validate_unpack_observability_metrics(unpack)
+    if worker_process is not None:
+        try:
+            process_cpu = {
+                name: int(worker_process[name])
+                for name in (
+                    "elapsed_ns", "user_cpu_ns", "system_cpu_ns",
+                    "cpu_time_ns",
+                )
+            }
+        except (KeyError, TypeError, ValueError) as error:
+            raise StageError(
+                "COLLECTING", ["parse", "worker.process.json"], 1,
+                json.dumps(worker_process, sort_keys=True), repr(error),
+                "HARNESS_FAIL",
+            ) from error
+        if (
+            any(value < 0 for value in process_cpu.values())
+            or process_cpu["elapsed_ns"] <= 0
+            or process_cpu["cpu_time_ns"]
+            != process_cpu["user_cpu_ns"] + process_cpu["system_cpu_ns"]
+            or unpack["payload_copy_bytes"] <= 0
+        ):
+            raise StageError(
+                "COLLECTING", ["validate", "worker-process-accounting"], 1,
+                json.dumps(worker_process, sort_keys=True),
+                "invalid unpack process CPU accounting", "HARNESS_FAIL",
+            )
+        process_cpu["payload_bytes"] = unpack["payload_copy_bytes"]
+        process_cpu["average_cpu_cores"] = (
+            process_cpu["cpu_time_ns"] / process_cpu["elapsed_ns"]
+        )
+        process_cpu["cpu_seconds_per_payload_gb"] = (
+            process_cpu["cpu_time_ns"] / unpack["payload_copy_bytes"]
+        )
+        unpack["process_cpu"] = process_cpu
     unpack["station"] = [
         {
             "antenna": int(antenna),

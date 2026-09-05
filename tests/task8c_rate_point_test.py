@@ -1313,6 +1313,38 @@ class Task8cRatePointTest(unittest.TestCase):
         self.assertNotIn(
             '/usr/bin/taskset -c 14,15,16,17,18,19', bundle["start.sh"]
         )
+        self.assertEqual(
+            plan.as_dict()["unpack_threading"],
+            {
+                "coordinator_cpu": 14,
+                "parser_worker_cpus": [15, 16, 17, 18],
+                "parser_worker_count": 4,
+                "writer_cpu": 19,
+            },
+        )
+
+    def test_two_worker_override_changes_only_parser_worker_mapping(self):
+        plan = dataclasses.replace(
+            make_plan(
+                30.2505, 60.0, compute_consumer="dbnull",
+                pipeline_stage="unpack",
+            ),
+            receiver_poll_cpu=13,
+            worker_cpu_list="14,15,16,19",
+            sink_cpu_list="20",
+            numa_node=1,
+            unpack_start_delay_seconds=1,
+        )
+
+        self.assertEqual(
+            plan.as_dict()["unpack_threading"],
+            {
+                "coordinator_cpu": 14,
+                "parser_worker_cpus": [15, 16],
+                "parser_worker_count": 2,
+                "writer_cpu": 19,
+            },
+        )
 
     def test_worker_cpu_list_omitted_keeps_default_scheduler(self):
         plan = make_plan(1.0, 30.0, compute_consumer="dbnull")
@@ -2345,7 +2377,13 @@ class Task8cRatePointTest(unittest.TestCase):
             f"fully_missing_groups=0 missing_station=0/{records} "
             "large_gap_advances=0/0 max_station_ordinal_skew=0 "
             "raw_blocks_single=0 raw_blocks_mixed=1 "
-            "max_station_records_per_raw_block=1 max_consecutive_station_records=1\n"
+            "max_station_records_per_raw_block=1 max_consecutive_station_records=1 "
+            "payload_copies=100/409600 emitted_blocks=1 emitted_bytes=409600 "
+            "writer_acquire=1 commit=1 blocks=1 bytes=409600 "
+            "acquire_wait_ns=10 writer_queue_hwm=1 writer_queue_capacity=8 "
+            "writer_enqueue_wait_ns=20 "
+            "raw_block_service=1/1000/1000/1000/1000 "
+            "raw_block_arrival=0/0/0/0/0 timing_quantization_ns=10000\n"
             f"VDIF unpack station statistics: antenna=0 station=101 "
             f"observed={plan.group_count} accepted={plan.group_count} late=0 "
             f"highest_ordinal={plan.group_count - 1}\n"
@@ -2435,7 +2473,13 @@ class Task8cRatePointTest(unittest.TestCase):
             "large_gap_advances=0/0 max_station_ordinal_skew=0 "
             "raw_blocks_single=0 raw_blocks_mixed=1 "
             "max_station_records_per_raw_block=1 "
-            "max_consecutive_station_records=1\n"
+            "max_consecutive_station_records=1 "
+            "payload_copies=100/409600 emitted_blocks=1 emitted_bytes=409600 "
+            "writer_acquire=1 commit=1 blocks=1 bytes=409600 "
+            "acquire_wait_ns=10 writer_queue_hwm=1 writer_queue_capacity=8 "
+            "writer_enqueue_wait_ns=20 "
+            "raw_block_service=1/1000/1000/1000/1000 "
+            "raw_block_arrival=0/0/0/0/0 timing_quantization_ns=10000\n"
             f"VDIF unpack station statistics: antenna=0 station=101 "
             f"observed={plan.group_count - 1} accepted={plan.group_count - 1} "
             f"late=0 highest_ordinal={plan.group_count - 1}\n"
@@ -3000,7 +3044,13 @@ class Task8cRatePointTest(unittest.TestCase):
             "large_gap_advances=0/0 max_station_ordinal_skew=0 "
             "raw_blocks_single=0 raw_blocks_mixed=149 "
             "max_station_records_per_raw_block=1024 "
-            "max_consecutive_station_records=16\n"
+            "max_consecutive_station_records=16 "
+            "payload_copies=100/409600 emitted_blocks=1 emitted_bytes=409600 "
+            "writer_acquire=1 commit=1 blocks=1 bytes=409600 "
+            "acquire_wait_ns=10 writer_queue_hwm=1 writer_queue_capacity=8 "
+            "writer_enqueue_wait_ns=20 "
+            "raw_block_service=1/1000/1000/1000/1000 "
+            "raw_block_arrival=0/0/0/0/0 timing_quantization_ns=10000\n"
             f"VDIF unpack station statistics: antenna=0 station=101 "
             f"observed={plan.group_count} accepted={plan.group_count} "
             f"late=0 highest_ordinal={plan.group_count - 1}\n"
@@ -3916,6 +3966,17 @@ class Task8cRatePointTest(unittest.TestCase):
             self.assertEqual(process.returncode, 0)
             self.assertEqual(marker.read_text(), "terminated")
             self.assertEqual(exit_path.read_text().strip(), "0")
+            process_record = json.loads(
+                exit_path.with_name("receiver.process.json").read_text()
+            )
+            self.assertGreater(process_record["elapsed_ns"], 0)
+            self.assertGreaterEqual(process_record["user_cpu_ns"], 0)
+            self.assertGreaterEqual(process_record["system_cpu_ns"], 0)
+            self.assertEqual(
+                process_record["cpu_time_ns"],
+                process_record["user_cpu_ns"]
+                + process_record["system_cpu_ns"],
+            )
 
     def test_qths_logs_are_parsed_into_reconciled_statistics(self):
         plan = make_plan(1.0, 10.0)
@@ -3935,7 +3996,15 @@ class Task8cRatePointTest(unittest.TestCase):
             "large_gap_advances=0/0 max_station_ordinal_skew=3 "
             "raw_blocks_single=1 raw_blocks_mixed=148 "
             "max_station_records_per_raw_block=1024 "
-            "max_consecutive_station_records=32\n"
+            "max_consecutive_station_records=32 "
+            "payload_copies=302816/1240350720 "
+            "emitted_blocks=24 emitted_bytes=1240350720 "
+            "writer_acquire=24 commit=24 blocks=24 bytes=1240350720 "
+            "acquire_wait_ns=12000 writer_queue_hwm=7 "
+            "writer_queue_capacity=33 writer_enqueue_wait_ns=34000 "
+            "raw_block_service=149/1200000000/12000000/7000000/9000000 "
+            "raw_block_arrival=148/1250000000/13000000/8000000/10000000 "
+            "timing_quantization_ns=10000\n"
             f"VDIF unpack station statistics: antenna=0 station=101 "
             f"observed={plan.group_count} accepted={plan.group_count} "
             f"late=0 highest_ordinal={plan.group_count - 1}\n"
@@ -3959,7 +4028,16 @@ class Task8cRatePointTest(unittest.TestCase):
         }
         plan = dataclasses.replace(plan, pipeline_stage="unpack")
         statistics = MODULE.parse_qths_statistics(
-            receiver, worker, compute, expect_pipeline_worker=False
+            receiver,
+            worker,
+            compute,
+            expect_pipeline_worker=False,
+            worker_process={
+                "user_cpu_ns": 900000000,
+                "system_cpu_ns": 100000000,
+                "cpu_time_ns": 1000000000,
+                "elapsed_ns": 1500000000,
+            },
         )
         MODULE._validate_statistics(statistics, plan, "65667071")
         self.assertEqual(statistics["receiver"]["accepted"], records)
@@ -3967,6 +4045,51 @@ class Task8cRatePointTest(unittest.TestCase):
         self.assertEqual(statistics["unpack"]["max_station_ordinal_skew"], 3)
         self.assertEqual(statistics["unpack"]["station"][0]["station"], 101)
         self.assertEqual(statistics["compute"]["sample_hex"], "65667071")
+        self.assertEqual(statistics["unpack"]["payload_copy_bytes"], 1240350720)
+        self.assertEqual(statistics["unpack"]["writer_queue_high_watermark"], 7)
+        self.assertEqual(statistics["unpack"]["writer_queue_capacity"], 33)
+        self.assertEqual(statistics["unpack"]["raw_block_service_ns_p95"], 9000000)
+        self.assertEqual(statistics["unpack"]["raw_block_arrival_interval_ns_p50"], 8000000)
+        self.assertEqual(statistics["unpack"]["process_cpu"]["cpu_time_ns"], 1000000000)
+        self.assertAlmostEqual(
+            statistics["unpack"]["process_cpu"]["average_cpu_cores"],
+            2 / 3,
+        )
+        self.assertAlmostEqual(
+            statistics["unpack"]["process_cpu"]["cpu_seconds_per_payload_gb"],
+            1000000000 / 1240350720,
+        )
+        MODULE._annotate_unpack_performance(statistics["unpack"], plan)
+        performance = statistics["unpack"]["performance"]
+        expected_interval_ns = plan.raw_block_bytes * 8 / plan.aggregate_gbps
+        self.assertAlmostEqual(
+            performance["planned_raw_block_interval_ns"], expected_interval_ns
+        )
+        self.assertAlmostEqual(
+            performance["service_capacity_gbps_at_p95"],
+            plan.raw_block_bytes * 8 / 9000000,
+        )
+        self.assertAlmostEqual(
+            performance["service_headroom_ratio_at_p95"],
+            expected_interval_ns / 9000000 - 1.0,
+        )
+        self.assertAlmostEqual(
+            performance["writer_queue_high_watermark_ratio"], 7 / 33
+        )
+
+        invalid_queue = worker.replace(
+            "writer_queue_hwm=7 writer_queue_capacity=33",
+            "writer_queue_hwm=34 writer_queue_capacity=33",
+        )
+        with self.assertRaises(MODULE.StageError) as raised:
+            MODULE.parse_qths_statistics(
+                receiver,
+                invalid_queue,
+                compute,
+                expect_pipeline_worker=False,
+            )
+        self.assertEqual(raised.exception.classification, "HARNESS_FAIL")
+        self.assertIn("writer_queue_high_watermark", raised.exception.stderr)
 
     def test_dbdisk_statistics_reject_mixed_configuration_identity(self):
         plan = make_plan(0.1, 10.0)
@@ -3976,6 +4099,39 @@ class Task8cRatePointTest(unittest.TestCase):
         with self.assertRaises(MODULE.StageError) as raised:
             MODULE._validate_statistics(statistics, plan, "65667071")
         self.assertEqual(raised.exception.classification, "PRODUCT_FAIL")
+
+    def test_unpack_performance_annotation_uses_p95_and_queue_capacity(self):
+        plan = dataclasses.replace(
+            make_plan(
+                30.2505, 60.0, compute_consumer="dbnull",
+                pipeline_stage="unpack",
+            ),
+            worker_cpu_list="14,15,16,19",
+        )
+        unpack = {
+            "raw_block_service_ns_p95": 12_000_000,
+            "writer_queue_high_watermark": 7,
+            "writer_queue_capacity": 33,
+        }
+
+        MODULE._annotate_unpack_performance(unpack, plan)
+
+        performance = unpack["performance"]
+        expected_interval_ns = plan.raw_block_bytes * 8 / plan.aggregate_gbps
+        self.assertAlmostEqual(
+            performance["planned_raw_block_interval_ns"], expected_interval_ns
+        )
+        self.assertAlmostEqual(
+            performance["service_capacity_gbps_at_p95"],
+            plan.raw_block_bytes * 8 / 12_000_000,
+        )
+        self.assertAlmostEqual(
+            performance["service_headroom_ratio_at_p95"],
+            expected_interval_ns / 12_000_000 - 1.0,
+        )
+        self.assertAlmostEqual(
+            performance["writer_queue_high_watermark_ratio"], 7 / 33
+        )
 
     def test_preflight_only_runs_configuration_gate_without_starting_pipeline(self):
         with tempfile.TemporaryDirectory() as directory:

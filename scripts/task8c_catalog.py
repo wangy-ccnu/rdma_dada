@@ -191,6 +191,7 @@ def validate_suite(path, expected_suite_id=None):
         raise ValueError("suite summary has no runs")
     runs = []
     expected_run_files = set()
+    expected_telemetry_files = set()
     seen_run_ids = set()
     for item in run_items:
         if not isinstance(item, dict):
@@ -242,6 +243,51 @@ def validate_suite(path, expected_suite_id=None):
             run.get("failure"), dict
         ):
             raise ValueError("failed run has no structured failure: %s" % relative_text)
+        telemetry = run.get("statistics", {}).get("gpu_telemetry")
+        if telemetry is not None:
+            if not isinstance(telemetry, dict):
+                raise ValueError("run GPU telemetry must be an object")
+            raw_files = telemetry.get("raw_files")
+            if not isinstance(raw_files, list) or len(raw_files) != 2:
+                raise ValueError("run GPU telemetry must reference two raw files")
+            expected_names = {
+                "gpu-telemetry-device.csv", "gpu-telemetry-process.log",
+            }
+            observed_names = set()
+            for raw in raw_files:
+                if not isinstance(raw, dict):
+                    raise ValueError("run GPU telemetry raw file must be an object")
+                raw_text = raw.get("path")
+                if not isinstance(raw_text, str):
+                    raise ValueError("run GPU telemetry path must be a string")
+                raw_relative = pathlib.PurePosixPath(raw_text)
+                expected_parent = pathlib.PurePosixPath("telemetry") / run_id
+                if (
+                    raw_relative.is_absolute()
+                    or ".." in raw_relative.parts
+                    or raw_relative.parent != expected_parent
+                    or raw_relative.name not in expected_names
+                ):
+                    raise ValueError("unsafe GPU telemetry path: %s" % raw_text)
+                raw_path = suite.joinpath(*raw_relative.parts)
+                raw_sha = raw.get("sha256")
+                raw_bytes = raw.get("bytes")
+                if not raw_path.is_file():
+                    raise ValueError("GPU telemetry file is missing: %s" % raw_text)
+                if not isinstance(raw_sha, str) or not HEX64.fullmatch(raw_sha):
+                    raise ValueError("GPU telemetry has invalid SHA256: %s" % raw_text)
+                if sha256_file(raw_path) != raw_sha:
+                    raise ValueError("GPU telemetry SHA256 mismatch: %s" % raw_text)
+                if (
+                    isinstance(raw_bytes, bool)
+                    or not isinstance(raw_bytes, int)
+                    or raw_bytes != raw_path.stat().st_size
+                ):
+                    raise ValueError("GPU telemetry byte count mismatch: %s" % raw_text)
+                observed_names.add(raw_relative.name)
+                expected_telemetry_files.add(raw_text)
+            if observed_names != expected_names:
+                raise ValueError("GPU telemetry raw file set mismatch")
         runs.append(run)
     actual_run_files = {
         path.name for path in (suite / "runs").iterdir() if path.is_file()
@@ -286,6 +332,7 @@ def validate_suite(path, expected_suite_id=None):
     }
     for name in expected_run_files:
         expected_files.add("runs/%s" % name)
+    expected_files.update(expected_telemetry_files)
     allowed_debug = set()
     for item in failed_items:
         run_id = item.get("run_id")
