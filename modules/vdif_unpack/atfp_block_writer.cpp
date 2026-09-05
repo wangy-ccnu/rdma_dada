@@ -269,6 +269,7 @@ bool AsyncAtfpBlockWriter::Configure(
     impl_->failed = false;
     impl_->error.clear();
     impl_->statistics = AsyncAtfpBlockWriterStatistics();
+    impl_->statistics.queue_capacity = queue_capacity;
     impl_->configured = true;
     impl_->thread = std::thread(&Impl::Run, impl_.get());
     {

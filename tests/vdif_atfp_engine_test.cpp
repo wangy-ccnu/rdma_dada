@@ -1,5 +1,6 @@
 #include "rdma_dada/modules/vdif_unpack/project_vdif_v1.h"
 #include "rdma_dada/modules/vdif_unpack/vdif_atfp_engine.h"
+#include "rdma_dada/modules/vdif_unpack/fixed_latency_histogram.h"
 #include "rdma_dada/modules/vdif_unpack/vdif_unpack_engine.h"
 
 #include <algorithm>
@@ -24,6 +25,26 @@ void Expect(bool condition, const std::string& message) {
         std::cerr << "FAIL: " << message << '\n';
         ++failures;
     }
+}
+
+void TestFixedLatencyHistogramReportsBoundedQuantiles() {
+    namespace unpack = rdma_dada::modules::vdif_unpack;
+    unpack::FixedLatencyHistogram histogram(100U, 4U);
+    histogram.Record(10U);
+    histogram.Record(90U);
+    histogram.Record(110U);
+    histogram.Record(250U);
+    histogram.Record(1000U);
+
+    Expect(histogram.count() == 5U && histogram.total_ns() == 1460U &&
+               histogram.maximum_ns() == 1000U,
+           "latency histogram reports exact count, total and maximum");
+    Expect(histogram.QuantileNs(0.50) == 200U,
+           "latency histogram reports the median bucket upper bound");
+    Expect(histogram.QuantileNs(0.95) == 1000U,
+           "latency histogram reports observed maximum for overflow quantile");
+    Expect(histogram.quantization_ns() == 100U,
+           "latency histogram exposes quantization");
 }
 
 rdma_dada::PipelineConfig MakePipeline() {
@@ -605,6 +626,10 @@ void TestStationSkewAndRawBlockCompositionStatistics() {
     Expect(engine.ConsumeRawBlock(records.data(), records.size(), 30, emit,
                                   &error),
            "station statistics block consumes: " + error);
+    Expect(engine.statistics().raw_block_service_samples == 0U,
+           "latency quantiles are deferred until transfer finish");
+    Expect(engine.Finish(emit, &error),
+           "station statistics transfer finishes: " + error);
 
     const unpack::VdifAtfpStatistics& stats = engine.statistics();
     Expect(stats.station_observed_packets.size() == 3U &&
@@ -633,6 +658,14 @@ void TestStationSkewAndRawBlockCompositionStatistics() {
            "maximum records from one Station in a raw block is measured");
     Expect(stats.max_consecutive_station_records == 3U,
            "maximum consecutive Station run is measured");
+    Expect(stats.raw_block_service_samples == 1U &&
+               stats.raw_block_service_ns_total > 0U &&
+               stats.raw_block_service_ns_p50 > 0U &&
+               stats.raw_block_service_ns_p95 >=
+                   stats.raw_block_service_ns_p50,
+           "raw-block active service latency is summarized once per block");
+    Expect(stats.raw_block_arrival_interval_samples == 0U,
+           "the first raw block has no arrival interval sample");
 }
 
 void TestPacketClassificationAndPartialEod() {
@@ -713,6 +746,7 @@ void TestExpectedTransferOverflowIsRejected() {
 }  // namespace
 
 int main() {
+    TestFixedLatencyHistogramReportsBoundedQuantiles();
     {
         unpack::VdifAtfpUnpackEngine engine;
         std::string error;

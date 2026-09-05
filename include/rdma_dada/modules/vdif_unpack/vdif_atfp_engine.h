@@ -40,6 +40,17 @@ struct VdifAtfpStatistics {
     std::uint64_t payload_copy_bytes;
     std::uint64_t emitted_blocks;
     std::uint64_t emitted_bytes;
+    std::uint64_t raw_block_service_samples;
+    std::uint64_t raw_block_service_ns_total;
+    std::uint64_t raw_block_service_ns_max;
+    std::uint64_t raw_block_service_ns_p50;
+    std::uint64_t raw_block_service_ns_p95;
+    std::uint64_t raw_block_arrival_interval_samples;
+    std::uint64_t raw_block_arrival_interval_ns_total;
+    std::uint64_t raw_block_arrival_interval_ns_max;
+    std::uint64_t raw_block_arrival_interval_ns_p50;
+    std::uint64_t raw_block_arrival_interval_ns_p95;
+    std::uint64_t timing_quantization_ns;
     std::vector<std::uint64_t> station_observed_packets;
     std::vector<std::uint64_t> station_accepted_packets;
     std::vector<std::uint64_t> station_late_packets;

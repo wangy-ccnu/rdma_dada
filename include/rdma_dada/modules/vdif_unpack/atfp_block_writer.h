@@ -42,6 +42,7 @@ private:
 
 struct AsyncAtfpBlockWriterStatistics {
     std::uint64_t enqueued_blocks;
+    std::uint64_t queue_capacity;
     std::uint64_t queue_high_watermark;
     std::uint64_t enqueue_wait_ns;
 };

@@ -236,6 +236,8 @@ void TestAsyncWriterPreservesFifoAndReleasesLeases() {
            "async writer releases leases in FIFO order");
     Expect(writer.statistics().enqueued_blocks == 2U,
            "async writer reports enqueue count");
+    Expect(writer.statistics().queue_capacity == 2U,
+           "async writer reports queue capacity with its high-water mark");
 }
 
 }  // namespace

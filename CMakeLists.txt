@@ -77,6 +77,7 @@ target_link_libraries(rdma_pipeline_core PUBLIC rdma_pipeline_config)
 
 add_library(rdma_module_vdif_unpack STATIC
     modules/vdif_unpack/atfp_block_writer.cpp
+    modules/vdif_unpack/fixed_latency_histogram.cpp
     modules/vdif_unpack/project_vdif_v1.cpp
     modules/vdif_unpack/vdif_atfp_engine.cpp
     modules/vdif_unpack/vdif_unpack_config.cpp

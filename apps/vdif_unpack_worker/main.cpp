@@ -550,7 +550,10 @@ int CloseTransferBody(dada_client_t* client) {
              "emitted_blocks=%llu emitted_bytes=%llu "
              "writer_acquire=%llu commit=%llu blocks=%llu bytes=%llu "
              "acquire_wait_ns=%llu writer_queue_hwm=%llu "
-             "writer_enqueue_wait_ns=%llu\n",
+             "writer_queue_capacity=%llu writer_enqueue_wait_ns=%llu "
+             "raw_block_service=%llu/%llu/%llu/%llu/%llu "
+             "raw_block_arrival=%llu/%llu/%llu/%llu/%llu "
+             "timing_quantization_ns=%llu\n",
              static_cast<unsigned long long>(statistics.received_records),
              static_cast<unsigned long long>(statistics.accepted_packets),
              static_cast<unsigned long long>(
@@ -593,7 +596,31 @@ int CloseTransferBody(dada_client_t* client) {
              static_cast<unsigned long long>(
                  async_statistics.queue_high_watermark),
              static_cast<unsigned long long>(
-                 async_statistics.enqueue_wait_ns));
+                 async_statistics.queue_capacity),
+             static_cast<unsigned long long>(
+                 async_statistics.enqueue_wait_ns),
+             static_cast<unsigned long long>(
+                 statistics.raw_block_service_samples),
+             static_cast<unsigned long long>(
+                 statistics.raw_block_service_ns_total),
+             static_cast<unsigned long long>(
+                 statistics.raw_block_service_ns_max),
+             static_cast<unsigned long long>(
+                 statistics.raw_block_service_ns_p50),
+             static_cast<unsigned long long>(
+                 statistics.raw_block_service_ns_p95),
+             static_cast<unsigned long long>(
+                 statistics.raw_block_arrival_interval_samples),
+             static_cast<unsigned long long>(
+                 statistics.raw_block_arrival_interval_ns_total),
+             static_cast<unsigned long long>(
+                 statistics.raw_block_arrival_interval_ns_max),
+             static_cast<unsigned long long>(
+                 statistics.raw_block_arrival_interval_ns_p50),
+             static_cast<unsigned long long>(
+                 statistics.raw_block_arrival_interval_ns_p95),
+             static_cast<unsigned long long>(
+                 statistics.timing_quantization_ns));
 
     for (std::size_t antenna = 0;
          antenna < runtime->config.antenna_map.size(); ++antenna) {

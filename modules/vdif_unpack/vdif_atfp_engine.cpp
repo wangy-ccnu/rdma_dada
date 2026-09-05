@@ -1,8 +1,10 @@
 #include "rdma_dada/modules/vdif_unpack/vdif_atfp_engine.h"
 
+#include "rdma_dada/modules/vdif_unpack/fixed_latency_histogram.h"
 #include "rdma_dada/modules/vdif_unpack/project_vdif_v1.h"
 
 #include <algorithm>
+#include <chrono>
 #include <condition_variable>
 #include <cstring>
 #include <limits>
@@ -63,6 +65,10 @@ struct VdifAtfpUnpackEngine::Impl {
     VdifTimeline timeline;
     ProjectVdifGeometry geometry;
     VdifAtfpStatistics statistics;
+    FixedLatencyHistogram raw_block_service_latency;
+    FixedLatencyHistogram raw_block_arrival_latency;
+    std::chrono::steady_clock::time_point previous_raw_block_entry;
+    bool has_previous_raw_block_entry;
     std::vector<std::uint8_t> payload_window;
     std::vector<std::uint8_t> station_seen;
     std::vector<GroupSlot> slots;
@@ -99,7 +105,9 @@ struct VdifAtfpUnpackEngine::Impl {
     bool discard_before_timeline_start;
 
     Impl()
-        : statistics(), groups_per_compute_block(0),
+        : statistics(), raw_block_service_latency(10000U, 10000U),
+          raw_block_arrival_latency(10000U, 10000U),
+          has_previous_raw_block_entry(false), groups_per_compute_block(0),
           reorder_horizon_groups(0), next_emit_ordinal(0),
           raw_block_bytes(0), last_raw_block_sequence(0),
           has_raw_block_sequence(false), prepared(false), configured(false),
@@ -108,6 +116,31 @@ struct VdifAtfpUnpackEngine::Impl {
           workers_completed(0U), workers_ready(0U),
           worker_affinity_failed(false), worker_raw_data(NULL),
           worker_record_count(0U), next_lease_id(1U) {}
+
+    void UpdateRawBlockTimingStatistics() {
+        statistics.raw_block_service_samples =
+            raw_block_service_latency.count();
+        statistics.raw_block_service_ns_total =
+            raw_block_service_latency.total_ns();
+        statistics.raw_block_service_ns_max =
+            raw_block_service_latency.maximum_ns();
+        statistics.raw_block_service_ns_p50 =
+            raw_block_service_latency.QuantileNs(0.50);
+        statistics.raw_block_service_ns_p95 =
+            raw_block_service_latency.QuantileNs(0.95);
+        statistics.raw_block_arrival_interval_samples =
+            raw_block_arrival_latency.count();
+        statistics.raw_block_arrival_interval_ns_total =
+            raw_block_arrival_latency.total_ns();
+        statistics.raw_block_arrival_interval_ns_max =
+            raw_block_arrival_latency.maximum_ns();
+        statistics.raw_block_arrival_interval_ns_p50 =
+            raw_block_arrival_latency.QuantileNs(0.50);
+        statistics.raw_block_arrival_interval_ns_p95 =
+            raw_block_arrival_latency.QuantileNs(0.95);
+        statistics.timing_quantization_ns =
+            raw_block_service_latency.quantization_ns();
+    }
 
     ~Impl() { StopWorkers(); }
 
@@ -655,6 +688,9 @@ bool VdifAtfpUnpackEngine::BeginTransfer(
     }
     impl_->timeline = timeline;
     impl_->statistics = VdifAtfpStatistics();
+    impl_->raw_block_service_latency.Reset();
+    impl_->raw_block_arrival_latency.Reset();
+    impl_->has_previous_raw_block_entry = false;
     impl_->statistics.station_observed_packets.assign(impl_->pipeline.nant, 0U);
     impl_->statistics.station_accepted_packets.assign(impl_->pipeline.nant, 0U);
     impl_->statistics.station_late_packets.assign(impl_->pipeline.nant, 0U);
@@ -740,6 +776,17 @@ bool VdifAtfpUnpackEngine::ConsumeRawBlockAsync(
         return Fail("raw block sequence must increase", error);
     impl_->has_raw_block_sequence = true;
     impl_->last_raw_block_sequence = raw_block_sequence;
+
+    const std::chrono::steady_clock::time_point service_begin =
+        std::chrono::steady_clock::now();
+    if (impl_->has_previous_raw_block_entry) {
+        impl_->raw_block_arrival_latency.Record(
+            static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    service_begin - impl_->previous_raw_block_entry).count()));
+    }
+    impl_->previous_raw_block_entry = service_begin;
+    impl_->has_previous_raw_block_entry = true;
 
     const std::uint64_t record_count =
         size / impl_->layout.raw_record_bytes;
@@ -868,7 +915,13 @@ bool VdifAtfpUnpackEngine::ConsumeRawBlockAsync(
             impl_->pipeline.packet_payload_bytes;
     }
     impl_->RunWorkers(Impl::kWorkerCopy, data, record_count);
-    return impl_->EmitReadyFullBlocks(emit, error);
+    if (!impl_->EmitReadyFullBlocks(emit, error)) return false;
+    const std::chrono::steady_clock::time_point service_end =
+        std::chrono::steady_clock::now();
+    impl_->raw_block_service_latency.Record(static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            service_end - service_begin).count()));
+    return true;
 }
 
 bool VdifAtfpUnpackEngine::Finish(const VdifAtfpBlockEmitter& emit,
@@ -894,6 +947,9 @@ bool VdifAtfpUnpackEngine::FinishAsync(const VdifAtfpBlockEmitter& emit,
             remaining, impl_->groups_per_compute_block);
         if (!impl_->Publish(count, emit, error)) return false;
     }
+    // Quantile extraction scans the fixed histogram. Keep the hot block path
+    // O(1) and materialize the summary only once after the transfer closes.
+    impl_->UpdateRawBlockTimingStatistics();
     impl_->finished = true;
     return true;
 }
