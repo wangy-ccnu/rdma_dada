@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "feature_root": "/var/lib/rdma-dada/examples",
+  "profiles": {
+    "example-node-a-gpu0": {
+      "server_id": "node-a",
+      "gpu_id": 0,
+      "cpu": {
+        "receiver": [
+          0
+        ],
+        "unpack": [
+          1
+        ],
+        "gpu": [
+          2
+        ],
+        "workers": [
+          3,
+          4
+        ],
+        "sink": [
+          5
+        ],
+        "control": [
+          12
+        ]
+      },
+      "numa": {
+        "receiver": 0,
+        "unpack": 0,
+        "gpu": 0,
+        "workers": 0,
+        "sink": 0,
+        "control": 1
+      },
+      "rings": {
+        "raw_key": "0x1001",
+        "compute_key": "0x1002",
+        "output_key": "0x1003"
+      },
+      "ring_counts": {
+        "raw": 8,
+        "compute": 8,
+        "output": 8
+      },
+      "flow": {
+        "interface": "eth0",
+        "physical_port": "port-a",
+        "match": {
+          "destination_ip": "192.0.2.10",
+          "destination_port": 10000,
+          "protocol": "UDP"
+        }
+      },
+      "paths": {
+        "run_dir": "runs/node-a-gpu0",
+        "log_dir": "logs/node-a-gpu0"
+      },
+      "reservation": {
+        "host_ram_bytes": 1073741824,
+        "gpu_vram_bytes": 2147483648
+      },
+      "execution": {
+        "worker_count": 2,
+        "cuda_mode": "STAGED_PIPELINE",
+        "cuda_slots": 2,
+        "polling": "BUSY",
+          "receiver_poll_batch": 32,
+          "receiver_wr_num": 64,
+          "unpack_window_blocks": 2,
+          "unpack_queue_capacity": 64
+      },
+      "consumer": {
+        "type": "DADA_DBNULL",
+        "destination": "output-ring"
+      }
+    },
+    "example-node-b-gpu0": {
+      "server_id": "node-b",
+      "gpu_id": 0,
+      "cpu": {
+        "receiver": [
+          0
+        ],
+        "unpack": [
+          1
+        ],
+        "gpu": [
+          2
+        ],
+        "workers": [
+          3,
+          4
+        ],
+        "sink": [
+          5
+        ],
+        "control": [
+          12
+        ]
+      },
+      "numa": {
+        "receiver": 0,
+        "unpack": 0,
+        "gpu": 0,
+        "workers": 0,
+        "sink": 0,
+        "control": 1
+      },
+      "rings": {
+        "raw_key": "0x1001",
+        "compute_key": "0x1002",
+        "output_key": "0x1003"
+      },
+      "ring_counts": {
+        "raw": 8,
+        "compute": 8,
+        "output": 8
+      },
+      "flow": {
+        "interface": "eth0",
+        "physical_port": "port-b",
+        "match": {
+          "destination_ip": "192.0.2.11",
+          "destination_port": 10001,
+          "protocol": "UDP"
+        }
+      },
+      "paths": {
+        "run_dir": "runs/node-b-gpu0",
+        "log_dir": "logs/node-b-gpu0"
+      },
+      "reservation": {
+        "host_ram_bytes": 1073741824,
+        "gpu_vram_bytes": 2147483648
+      },
+      "execution": {
+        "worker_count": 2,
+        "cuda_mode": "STAGED_PIPELINE",
+        "cuda_slots": 2,
+        "polling": "BUSY",
+          "receiver_poll_batch": 32,
+          "receiver_wr_num": 64,
+          "unpack_window_blocks": 2,
+          "unpack_queue_capacity": 64
+      },
+      "consumer": {
+        "type": "DADA_DBNULL",
+        "destination": "output-ring"
+      }
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "observation": {
+    "observation_id": "multi-server-layout-example",
+    "utc_start": "2026-09-12-00:00:00",
+    "duration_seconds": "1.048576",
+    "station_ids": [1000, 1001, 1002, 1003],
+    "npol": 1,
+    "sample_interval_ps": 1000000
+  },
+  "channels": {
+    "first_channel_id": 100,
+    "nchan": 7,
+    "first_center_frequency_hz": 1200000000,
+    "channel_spacing_hz": 1000000
+  },
+  "wire": {
+    "profile": "packet_formats/frontend.example-v1.json",
+    "samples_per_packet": 512
+  },
+  "time_grid": {
+    "samples_per_block": 16384
+  },
+  "processing": {
+    "weights": {
+      "path": "weights/global-f7-p1-a4-b2.npy",
+      "order": "FPAB2",
+      "weights_id": "example-global-weights-f7-p1-a4-b2",
+      "weights_scale": "0.0078125",
+      "compute_mode": "FP32"
+    },
+    "conversion_scale": "0.0078125",
+    "product": "POWER",
+    "integration": {
+      "length": 128,
+      "operation": "MEAN"
+    }
+  },
+  "assignments": [
+    {
+      "server_id": "node-a",
+      "gpu_id": 0,
+      "first_channel_id": 100,
+      "nchan": 4,
+      "deployment_profile": "example-node-a-gpu0"
+    },
+    {
+      "server_id": "node-b",
+      "gpu_id": 0,
+      "first_channel_id": 104,
+      "nchan": 3,
+      "deployment_profile": "example-node-b-gpu0"
+    }
+  ],
+  "monitoring": {
+    "report_interval_ms": 1000,
+    "rate_window_ms": 5000,
+    "heartbeat_timeout_ms": 5000
+  }
+}

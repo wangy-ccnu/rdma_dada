@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyysky.github.io/rdma_dada/schemas/global-observation-v1.schema.json",
+  "title": "RDMA/DADA global multi-server observation configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "observation", "channels", "wire", "time_grid", "processing", "assignments", "monitoring"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "observation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["observation_id", "utc_start", "duration_seconds", "station_ids", "npol", "sample_interval_ps"],
+      "properties": {
+        "observation_id": { "type": "string", "minLength": 1 },
+        "utc_start": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}:[0-9]{2}:[0-9]{2}$" },
+        "duration_seconds": { "type": "string", "pattern": "^(?:[1-9][0-9]*(?:\\.[0-9]{1,12})?|0\\.(?=[0-9]{0,11}[1-9])[0-9]{1,12})$" },
+        "station_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "integer", "minimum": 0, "maximum": 65535 } },
+        "npol": { "enum": [1, 2] },
+        "sample_interval_ps": { "type": "integer", "minimum": 1, "maximum": 18446744073709551615 }
+      }
+    },
+    "channels": {
+      "type": "object", "additionalProperties": false,
+      "required": ["first_channel_id", "nchan", "first_center_frequency_hz", "channel_spacing_hz"],
+      "properties": {
+        "first_channel_id": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "nchan": { "type": "integer", "minimum": 1, "maximum": 65536 },
+        "first_center_frequency_hz": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+        "channel_spacing_hz": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 }
+      }
+    },
+    "wire": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "samples_per_packet"],
+      "properties": {
+        "profile": { "type": "string", "minLength": 1 },
+        "samples_per_packet": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
+      }
+    },
+    "time_grid": {
+      "type": "object", "additionalProperties": false,
+      "required": ["samples_per_block"],
+      "properties": { "samples_per_block": { "type": "integer", "minimum": 1, "maximum": 18446744073709551615 } }
+    },
+    "processing": {
+      "type": "object", "additionalProperties": false,
+      "required": ["weights", "conversion_scale", "product", "integration"],
+      "properties": {
+        "weights": {
+          "type": "object", "additionalProperties": false,
+          "required": ["path", "order", "weights_id", "weights_scale", "compute_mode"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "order": { "const": "FPAB2" },
+            "weights_id": { "type": "string", "minLength": 1 },
+            "weights_scale": { "$ref": "#/$defs/positive_decimal" },
+            "compute_mode": { "enum": ["FP32", "TF32"] }
+          }
+        },
+        "conversion_scale": { "$ref": "#/$defs/positive_decimal" },
+        "product": { "enum": ["POWER", "COHERENCY"] },
+        "integration": {
+          "type": "object", "additionalProperties": false,
+          "required": ["length", "operation"],
+          "properties": {
+            "length": { "type": "integer", "minimum": 1, "maximum": 18446744073709551615 },
+            "operation": { "enum": ["SUM", "MEAN"] }
+          }
+        }
+      }
+    },
+    "assignments": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["server_id", "gpu_id", "first_channel_id", "nchan", "deployment_profile"],
+        "properties": {
+          "server_id": { "type": "string", "minLength": 1 },
+          "gpu_id": { "type": "integer", "minimum": 0, "maximum": 255 },
+          "first_channel_id": { "type": "integer", "minimum": 0, "maximum": 65535 },
+          "nchan": { "type": "integer", "minimum": 1, "maximum": 255 },
+          "deployment_profile": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "monitoring": {
+      "type": "object", "additionalProperties": false,
+      "required": ["report_interval_ms", "rate_window_ms", "heartbeat_timeout_ms"],
+      "properties": {
+        "report_interval_ms": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "rate_window_ms": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "heartbeat_timeout_ms": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
+      }
+    }
+  },
+  "$defs": {
+    "positive_decimal": { "type": "string", "pattern": "^(?:[1-9][0-9]*(?:\\.[0-9]+)?|0\\.(?=[0-9]*[1-9])[0-9]+)$" }
+  }
+}

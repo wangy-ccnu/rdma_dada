@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyysky.github.io/rdma_dada/schemas/multiserver-deployment-v1.schema.json",
+  "title": "RDMA/DADA multi-server deployment declarations v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "feature_root", "profiles"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "feature_root": {"type": "string", "minLength": 1, "pattern": "^/.*$"},
+    "profiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/profile"}
+    }
+  },
+  "$defs": {
+    "cpu_lists": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "integer", "minimum": 0},
+      "uniqueItems": true
+    },
+    "numa_map": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receiver", "unpack", "gpu", "workers", "sink", "control"],
+      "properties": {
+        "receiver": {"type": "integer", "minimum": 0},
+        "unpack": {"type": "integer", "minimum": 0},
+        "gpu": {"type": "integer", "minimum": 0},
+        "workers": {"type": "integer", "minimum": 0},
+        "sink": {"type": "integer", "minimum": 0},
+        "control": {"type": "integer", "minimum": 0}
+      }
+    },
+    "ipv4_value": {
+      "oneOf": [
+        {"const": "*"},
+        {"type": "null"},
+        {"type": "string", "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$"}
+      ]
+    },
+    "port_value": {
+      "oneOf": [
+        {"const": "*"},
+        {"type": "null"},
+        {"type": "integer", "minimum": 1, "maximum": 65535}
+      ]
+    },
+    "protocol_value": {"enum": ["UDP", "TCP", "udp", "tcp", "*", null]},
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "server_id", "gpu_id", "cpu", "numa", "rings", "ring_counts",
+        "flow", "paths", "reservation", "execution", "consumer"
+      ],
+      "properties": {
+        "server_id": {"type": "string", "minLength": 1},
+        "gpu_id": {"type": "integer", "minimum": 0, "maximum": 255},
+        "cpu": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["receiver", "unpack", "gpu", "workers", "sink", "control"],
+          "properties": {
+            "receiver": {"$ref": "#/$defs/cpu_lists"},
+            "unpack": {"$ref": "#/$defs/cpu_lists"},
+            "gpu": {"$ref": "#/$defs/cpu_lists"},
+            "workers": {"$ref": "#/$defs/cpu_lists"},
+            "sink": {"$ref": "#/$defs/cpu_lists"},
+            "control": {"$ref": "#/$defs/cpu_lists"}
+          }
+        },
+        "numa": {"$ref": "#/$defs/numa_map"},
+        "rings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["raw_key", "compute_key", "output_key"],
+          "properties": {
+            "raw_key": {"type": "string", "pattern": "^0[xX][0-9A-Fa-f]{1,8}$"},
+            "compute_key": {"type": "string", "pattern": "^0[xX][0-9A-Fa-f]{1,8}$"},
+            "output_key": {"type": "string", "pattern": "^0[xX][0-9A-Fa-f]{1,8}$"}
+          }
+        },
+        "ring_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["raw", "compute", "output"],
+          "properties": {
+            "raw": {"type": "integer", "minimum": 2},
+            "compute": {"type": "integer", "minimum": 1},
+            "output": {"type": "integer", "minimum": 1}
+          }
+        },
+        "flow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["interface", "physical_port", "match"],
+          "properties": {
+            "interface": {"type": "string", "minLength": 1},
+            "physical_port": {"type": "string", "minLength": 1},
+            "match": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "destination_ip": {"$ref": "#/$defs/ipv4_value"},
+                "destination_port": {"$ref": "#/$defs/port_value"},
+                "source_ip": {"$ref": "#/$defs/ipv4_value"},
+                "source_port": {"$ref": "#/$defs/port_value"},
+                "protocol": {"$ref": "#/$defs/protocol_value"}
+              }
+            }
+          }
+        },
+        "paths": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["run_dir", "log_dir"],
+          "properties": {
+            "run_dir": {"type": "string", "minLength": 1, "pattern": "^[^/].*$"},
+            "log_dir": {"type": "string", "minLength": 1, "pattern": "^[^/].*$"}
+          }
+        },
+        "reservation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["host_ram_bytes", "gpu_vram_bytes"],
+          "properties": {
+            "host_ram_bytes": {"type": "integer", "minimum": 1},
+            "gpu_vram_bytes": {"type": "integer", "minimum": 1}
+          }
+        },
+        "execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "worker_count", "cuda_mode", "cuda_slots", "polling",
+            "receiver_poll_batch", "receiver_wr_num", "unpack_window_blocks",
+            "unpack_queue_capacity"
+          ],
+          "properties": {
+            "worker_count": {"type": "integer", "minimum": 1},
+            "cuda_mode": {"enum": ["SYNCHRONOUS_DIRECT", "STAGED_PIPELINE"]},
+            "cuda_slots": {"type": "integer", "minimum": 1, "maximum": 4},
+            "polling": {"enum": ["BUSY", "WAIT"]},
+            "receiver_poll_batch": {"type": "integer", "minimum": 1},
+            "receiver_wr_num": {"type": "integer", "minimum": 1},
+            "unpack_window_blocks": {"type": "integer", "minimum": 2},
+            "unpack_queue_capacity": {"type": "integer", "minimum": 1}
+          }
+        },
+        "consumer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "destination"],
+          "properties": {
+            "type": {"enum": ["DADA_DBNULL", "DADA_DBDISK"]},
+            "destination": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    }
+  }
+}
