@@ -55,7 +55,6 @@ ctest --test-dir build-linux --output-on-failure
 | `vdif_unpack_engine_test` | `vdif_unpack_engine_test.cpp` | 保留旧 TFP→TFPA scatter 作为正确性参考，校验任意 Station 顺序、跨 block、零填充及错误统计 | `BUILD_TESTING=ON` |
 | `vdif_atfp_engine_test` | `vdif_atfp_engine_test.cpp` | 校验固定环形 slot、直接 Station lookup、每包单次 payload memcpy、ATFP block view、多 Station 最小 watermark、领先 Station 不淘汰落后数据、完全缺失/部分缺失补零、large gap、Station skew/raw-block 组成统计、固定内存 raw-block service/arrival 直方图、wrap/partial EOD 及与旧 TFPA reference 的等价性 | `BUILD_TESTING=ON` |
 | `atfp_block_writer_test` | `atfp_block_writer_test.cpp` | 验证每个 compute block 只 Acquire/Commit 一次、每个 A 平面无回绕一次复制/回绕最多两段复制、partial block 紧凑布局及 sink 失败路径 | `BUILD_TESTING=ON` |
-| `group_block_writer_test` | `group_block_writer_test.cpp` | 用内存 block sink 验证有序 group 直接填充满 block、EOD 精确提交部分 block、空传输不提交，以及 group/sink 容量错误不发布数据 | `BUILD_TESTING=ON` |
 | `vdif_sender_sim_test` | `vdif_sender_sim_test.cpp` | 校验严格 schema v1/v2/v3 sender JSON、单/多 Station、显式 source、PACED/batch/payload mode、整数皮秒跨秒/frame 重置、CI8/CI16、MTU 和 fault | `BUILD_TESTING=ON` |
 | `vdif_sender_rate_test` | `vdif_sender_rate_test.cpp` | 校验等速 Station 整数分配、固定点累计字节 deadline、零值和 uint64 overflow | `BUILD_TESTING=ON` |
 | `vdif_sender_batch_test` | `vdif_sender_batch_test.cpp` | 校验固定 packet pool 地址、连续 header、Station 模板、按时间组轮换 Station、O(1) Station 索引、repeat payload 和 deterministic reference 一致性 | `BUILD_TESTING=ON` |
@@ -210,17 +209,6 @@ ctest --test-dir build-linux \
 compute block、完全缺失 group，以及 `processing.run_once=false` 时同一 worker 的两个
 连续 transfer；同时验证错误 identity 和 ring block capacity 会在数据处理前失败。缺少
 `dada_db`、`dada_diskdb`、`dada_dbdisk` 等工具时返回 CTest skip code 77。
-
-### Compute group block writer 测试
-
-```bash
-./build/group_block_writer_test
-ctest --test-dir build -R '^group_block_writer_test$' --output-on-failure
-```
-
-该测试使用真实内存作为非 owning sink 边界，验证五个 4-byte group 依序形成一个
-12-byte 满 block 和一个 8-byte EOD block。未来 PSRDADA adapter 只需实现相同的
-`Acquire/Commit` 接口，writer 本身不申请或持有 ring block 存储。
 
 ### FPGA sender simulator 测试
 

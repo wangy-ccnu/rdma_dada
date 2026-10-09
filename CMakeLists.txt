@@ -66,7 +66,6 @@ target_include_directories(rdma_gpu_pressure_plan
 
 add_library(rdma_pipeline_core STATIC
     src/pipeline/ascii_metadata.cpp
-    src/pipeline/group_block_writer.cpp
     src/pipeline/metadata.cpp
     src/pipeline/ordered_slot_scheduler.cpp
     src/pipeline/worker_config.cpp)
@@ -298,8 +297,6 @@ if(BUILD_TESTING)
     target_link_libraries(vdif_atfp_engine_test PRIVATE rdma_module_vdif_unpack)
     add_executable(atfp_block_writer_test tests/atfp_block_writer_test.cpp)
     target_link_libraries(atfp_block_writer_test PRIVATE rdma_module_vdif_unpack)
-    add_executable(group_block_writer_test tests/group_block_writer_test.cpp)
-    target_link_libraries(group_block_writer_test PRIVATE rdma_pipeline_core)
     add_executable(vdif_sender_sim_test tests/vdif_sender_sim_test.cpp)
     target_link_libraries(vdif_sender_sim_test PRIVATE
         rdma_vdif_sender_sim
@@ -453,9 +450,6 @@ if(BUILD_TESTING)
     add_test(
         NAME atfp_block_writer_test
         COMMAND atfp_block_writer_test)
-    add_test(
-        NAME group_block_writer_test
-        COMMAND group_block_writer_test)
     add_test(
         NAME vdif_sender_sim_test
         COMMAND vdif_sender_sim_test

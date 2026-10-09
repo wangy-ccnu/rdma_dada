@@ -4403,6 +4403,84 @@ class Task8cRatePointTest(unittest.TestCase):
             MODULE.SshBackend = original
         self.assertEqual(return_code, 2)
 
+    def test_plan_and_request_sequences_preserve_measured_input_rates_and_artifacts(self):
+        class MeasuredSenderBackend(FakeBackend):
+            def wait_senders(self, plan, processes):
+                outputs = super().wait_senders(plan, processes)
+                return [json.dumps({**json.loads(output),
+                                    "actual_payload_gbps": 0.495})
+                        for output in outputs]
+
+        class MeasuredWriterBackend(GpuOnlyFakeBackend):
+            def collect(self, plan, run_dir):
+                result = super().collect(plan, run_dir)
+                result["input_writer"]["actual_payload_gbps"] = 0.99
+                return result
+
+        for stage, backend_type, consumer, source in (
+            ("full", MeasuredSenderBackend, "dbdisk", "senders.actual_payload_gbps_sum"),
+            ("gpu", MeasuredWriterBackend, "dbnull", "input_writer.actual_payload_gbps"),
+        ):
+            plan = make_plan(1.0, 10.0, compute_consumer=consumer, pipeline_stage=stage)
+            request = MODULE.RateRequest(1.0, 10.0, compute_consumer=consumer,
+                                         pipeline_stage=stage)
+            for entry in ("plan", "request"):
+                with self.subTest(stage=stage, entry=entry), tempfile.TemporaryDirectory() as directory:
+                    created = []
+
+                    def backend_factory():
+                        backend = backend_type()
+                        created.append(backend)
+                        return backend
+
+                    with mock.patch.object(MODULE, "compile_rate_plan", return_value=plan):
+                        arguments = (plan,) if entry == "plan" else (
+                            request, pathlib.Path("observation.json"), pathlib.Path("compiler"))
+                        runner = MODULE.run_rate_sequence if entry == "plan" else MODULE.run_rate_request_sequence
+                        summary = runner(*arguments, backend_factory, pathlib.Path(directory),
+                                         1, 3, suite_id="equivalence")
+                    self.assertEqual(summary["TEST_RESULT"], "PASS")
+                    self.assertEqual(summary["actual_aggregate_gbps"], {
+                        "median": 0.99, "minimum": 0.99, "maximum": 0.99, "spread": 0.0})
+                    self.assertEqual(summary["actual_aggregate_gbps_source"], source)
+                    self.assertEqual([run["run_id"] for run in summary["runs"]],
+                                     ["warmup-01", "measured-01", "measured-02", "measured-03"])
+                    self.assertEqual(len({id(backend) for backend in created}), 4)
+                    self.assertEqual("plan" in summary, entry == "plan")
+                    self.assertEqual("request" in summary, entry == "request")
+                    suite_root = pathlib.Path(directory) / "equivalence"
+                    for run in summary["runs"]:
+                        result = json.loads((suite_root / run["result_path"]).read_text())
+                        evidence = suite_root / "runs" / result["evidence_file"]
+                        self.assertEqual(result["evidence_sha256"],
+                                         hashlib.sha256(evidence.read_bytes()).hexdigest())
+                        self.assertFalse((suite_root / run["run_id"]).exists())
+                    for line in (suite_root / "MANIFEST.sha256").read_text().splitlines():
+                        digest, name = line.split("  ", 1)
+                        self.assertEqual(digest, hashlib.sha256((suite_root / name).read_bytes()).hexdigest())
+
+    def test_plan_and_request_sequences_stop_on_compaction_failure(self):
+        class IncompleteLedgerBackend(FakeBackend):
+            def prepare_configs(self, plan, run_dir, preparation):
+                return {"binary_sha": {"qths1:rdma2dada": "c" * 64}}
+
+        plan = make_plan()
+        for entry in ("plan", "request"):
+            with self.subTest(entry=entry), tempfile.TemporaryDirectory() as directory:
+                with mock.patch.object(MODULE, "compile_rate_plan", return_value=plan):
+                    arguments = (plan,) if entry == "plan" else (
+                        MODULE.RateRequest(1.0, 10.0), pathlib.Path("observation.json"), pathlib.Path("compiler"))
+                    runner = MODULE.run_rate_sequence if entry == "plan" else MODULE.run_rate_request_sequence
+                    summary = runner(*arguments, IncompleteLedgerBackend, pathlib.Path(directory),
+                                     1, 3, suite_id="compaction-failure")
+                self.assertEqual(summary["TEST_RESULT"], "HARNESS_FAIL")
+                self.assertEqual(len(summary["runs"]), 1)
+                self.assertEqual(summary["runs"][0]["run_id"], "warmup-01")
+                result = json.loads((pathlib.Path(directory) / "compaction-failure" /
+                                     summary["runs"][0]["result_path"]).read_text())
+                self.assertEqual(result["failure"]["stage"], "ARTIFACT_COMPACTION")
+                self.assertEqual(result["cleanup"]["CLEANUP_RESULT"], "PASS")
+
     def test_acceptance_sequence_runs_one_warmup_and_three_fresh_measurements(self):
         with tempfile.TemporaryDirectory() as directory:
             created = []

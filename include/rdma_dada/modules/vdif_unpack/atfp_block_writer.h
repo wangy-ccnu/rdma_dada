@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rdma_dada/modules/vdif_unpack/atfp_block_view.h"
-#include "rdma_dada/pipeline/group_block_writer.h"
+#include "rdma_dada/pipeline/writable_block_sink.h"
 
 #include <cstdint>
 #include <functional>

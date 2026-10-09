@@ -4996,90 +4996,9 @@ def run_rate_sequence(
     measured_runs: int,
     suite_id: str | None = None,
 ) -> dict[str, Any]:
-    if warmup_runs < 0 or measured_runs <= 0:
-        raise ValueError("warmup_runs must be non-negative and measured_runs positive")
-    resolved_suite_id = suite_id or (
-        time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-        + f"-{uuid.uuid4().hex[:8]}"
+    return _run_rate_sequence(
+        plan, backend_factory, result_root, warmup_runs, measured_runs, suite_id
     )
-    suite_root = pathlib.Path(result_root) / resolved_suite_id
-    suite_root.mkdir(parents=True, exist_ok=True)
-    runs: list[dict[str, Any]] = []
-    stop_sequence = False
-    for role, count in (("warmup", warmup_runs), ("measured", measured_runs)):
-        for index in range(1, count + 1):
-            run_id = f"{role}-{index:02d}"
-            result = RatePointController(
-                backend_factory(), suite_root, run_id=run_id
-            ).run(plan)
-            result = compact_suite_run(suite_root, run_id, result)
-            runs.append(
-                {
-                    "role": role,
-                    "index": index,
-                    "run_id": run_id,
-                    "TEST_RESULT": result["TEST_RESULT"],
-                    "CLEANUP_RESULT": result.get("cleanup", {}).get(
-                        "CLEANUP_RESULT", "FAIL"
-                    ),
-                    "result_path": f"runs/{run_id}.json",
-                }
-            )
-            if (
-                result["TEST_RESULT"] != "PASS"
-                or result.get("cleanup", {}).get("CLEANUP_RESULT") != "PASS"
-            ):
-                stop_sequence = True
-                break
-        if stop_sequence:
-            break
-    measured_results = [
-        json.loads((suite_root / run["result_path"]).read_text())
-        for run in runs
-        if run["role"] == "measured"
-    ]
-    measured_rates = [
-        _actual_result_payload_gbps(result)
-        for result in measured_results
-        if result["TEST_RESULT"] == "PASS"
-        and result.get("cleanup", {}).get("CLEANUP_RESULT") == "PASS"
-    ]
-    failures = [
-        run
-        for run in runs
-        if run["TEST_RESULT"] != "PASS" or run["CLEANUP_RESULT"] != "PASS"
-    ]
-    aggregate: dict[str, float] | None = None
-    if len(measured_rates) == measured_runs:
-        aggregate = {
-            "median": statistics.median(measured_rates),
-            "minimum": min(measured_rates),
-            "maximum": max(measured_rates),
-            "spread": max(measured_rates) - min(measured_rates),
-        }
-    summary = {
-        "TEST_RESULT": (
-            failures[0]["TEST_RESULT"]
-            if failures and failures[0]["TEST_RESULT"] != "PASS"
-            else "HARNESS_FAIL"
-            if failures
-            else "PASS"
-        ),
-        "suite_id": resolved_suite_id,
-        "plan": plan.as_dict(),
-        "warmup_count": warmup_runs,
-        "measured_count": measured_runs,
-        "runs": runs,
-        "actual_aggregate_gbps": aggregate,
-        "actual_aggregate_gbps_source": (
-            "input_writer.actual_payload_gbps"
-            if plan.pipeline_stage == "gpu"
-            else "senders.actual_payload_gbps_sum"
-        ),
-    }
-    _atomic_json(suite_root / "summary.json", summary)
-    _write_suite_manifest(suite_root)
-    return summary
 
 
 def run_rate_request_sequence(
@@ -5093,8 +5012,26 @@ def run_rate_request_sequence(
     suite_id: str | None = None,
     performance_characterization: bool = False,
 ) -> dict[str, Any]:
+    return _run_rate_sequence(
+        request, backend_factory, result_root, warmup_runs, measured_runs,
+        suite_id, observation_template, compiler, performance_characterization,
+    )
+
+
+def _run_rate_sequence(
+    input_plan: RatePlan | RateRequest,
+    backend_factory: Any,
+    result_root: pathlib.Path,
+    warmup_runs: int,
+    measured_runs: int,
+    suite_id: str | None,
+    observation_template: pathlib.Path | None = None,
+    compiler: pathlib.Path | None = None,
+    performance_characterization: bool = False,
+) -> dict[str, Any]:
     if warmup_runs < 0 or measured_runs <= 0:
         raise ValueError("warmup_runs must be non-negative and measured_runs positive")
+    is_request = isinstance(input_plan, RateRequest)
     resolved_suite_id = suite_id or (
         time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
         + f"-{uuid.uuid4().hex[:8]}"
@@ -5102,12 +5039,17 @@ def run_rate_request_sequence(
     suite_root = pathlib.Path(result_root) / resolved_suite_id
     suite_root.mkdir(parents=True, exist_ok=True)
     runs: list[dict[str, Any]] = []
+    stop_sequence = False
     for role, count in (("warmup", warmup_runs), ("measured", measured_runs)):
         for index in range(1, count + 1):
             run_id = f"{role}-{index:02d}"
-            result = RatePointController(
+            controller = RatePointController(
                 backend_factory(), suite_root, run_id=run_id
-            ).run_request(request, observation_template, compiler)
+            )
+            result = (
+                controller.run_request(input_plan, observation_template, compiler)
+                if is_request else controller.run(input_plan)
+            )
             result = compact_suite_run(suite_root, run_id, result)
             run = {
                 "role": role,
@@ -5129,19 +5071,16 @@ def run_rate_request_sequence(
                 run["TEST_RESULT"] != "PASS"
                 or run["CLEANUP_RESULT"] != "PASS"
             ) and not may_continue:
+                stop_sequence = True
                 break
-        if runs and (
-            runs[-1]["TEST_RESULT"] != "PASS"
-            or runs[-1]["CLEANUP_RESULT"] != "PASS"
-        ) and not (
-            performance_characterization
-            and runs[-1]["TEST_RESULT"] == "PERFORMANCE_FAIL"
-            and runs[-1]["CLEANUP_RESULT"] == "PASS"
-        ):
+        if stop_sequence:
             break
     measured_rates = []
     for run in runs:
         if run["role"] != "measured" or run["TEST_RESULT"] != "PASS":
+            continue
+        # Preserve the request summary's diagnostic rate on cleanup failure.
+        if not is_request and run["CLEANUP_RESULT"] != "PASS":
             continue
         result = json.loads((suite_root / run["result_path"]).read_text())
         measured_rates.append(_actual_result_payload_gbps(result))
@@ -5166,28 +5105,33 @@ def run_rate_request_sequence(
             else "PASS"
         ),
         "suite_id": resolved_suite_id,
-        "request": dataclasses.asdict(request),
         "warmup_count": warmup_runs,
         "measured_count": measured_runs,
-        "completed_warmup_count": sum(
-            run["role"] == "warmup" for run in runs
-        ),
-        "completed_measured_count": sum(
-            run["role"] == "measured" for run in runs
-        ),
         "runs": runs,
-        "performance_characterization": performance_characterization,
-        "unpack_loss_characterization": (
-            _summarize_unpack_loss(suite_root, runs)
-            if performance_characterization else None
-        ),
         "actual_aggregate_gbps": aggregate,
         "actual_aggregate_gbps_source": (
             "input_writer.actual_payload_gbps"
-            if request.pipeline_stage == "gpu"
+            if input_plan.pipeline_stage == "gpu"
             else "senders.actual_payload_gbps_sum"
         ),
     }
+    if is_request:
+        summary.update({
+            "request": dataclasses.asdict(input_plan),
+            "completed_warmup_count": sum(
+                run["role"] == "warmup" for run in runs
+            ),
+            "completed_measured_count": sum(
+                run["role"] == "measured" for run in runs
+            ),
+            "performance_characterization": performance_characterization,
+            "unpack_loss_characterization": (
+                _summarize_unpack_loss(suite_root, runs)
+                if performance_characterization else None
+            ),
+        })
+    else:
+        summary["plan"] = input_plan.as_dict()
     _atomic_json(suite_root / "summary.json", summary)
     _write_suite_manifest(suite_root)
     return summary
