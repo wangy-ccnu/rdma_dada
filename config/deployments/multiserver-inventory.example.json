@@ -1,0 +1,432 @@
+{
+  "hosts": [
+    {
+      "aliases": [
+        "node-a",
+        "fake-host-a"
+      ],
+      "cpus": {
+        "0": {
+          "core_id": 0,
+          "numa_node": 0,
+          "smt_siblings": [
+            0,
+            6
+          ],
+          "socket_id": 0
+        },
+        "1": {
+          "core_id": 1,
+          "numa_node": 0,
+          "smt_siblings": [
+            1,
+            7
+          ],
+          "socket_id": 0
+        },
+        "10": {
+          "core_id": 4,
+          "numa_node": 0,
+          "smt_siblings": [
+            4,
+            10
+          ],
+          "socket_id": 0
+        },
+        "11": {
+          "core_id": 5,
+          "numa_node": 0,
+          "smt_siblings": [
+            5,
+            11
+          ],
+          "socket_id": 0
+        },
+        "12": {
+          "core_id": 0,
+          "numa_node": 1,
+          "smt_siblings": [
+            12
+          ],
+          "socket_id": 1
+        },
+        "13": {
+          "core_id": 1,
+          "numa_node": 1,
+          "smt_siblings": [
+            13
+          ],
+          "socket_id": 1
+        },
+        "14": {
+          "core_id": 2,
+          "numa_node": 1,
+          "smt_siblings": [
+            14
+          ],
+          "socket_id": 1
+        },
+        "15": {
+          "core_id": 3,
+          "numa_node": 1,
+          "smt_siblings": [
+            15
+          ],
+          "socket_id": 1
+        },
+        "16": {
+          "core_id": 4,
+          "numa_node": 1,
+          "smt_siblings": [
+            16
+          ],
+          "socket_id": 1
+        },
+        "17": {
+          "core_id": 5,
+          "numa_node": 1,
+          "smt_siblings": [
+            17
+          ],
+          "socket_id": 1
+        },
+        "18": {
+          "core_id": 6,
+          "numa_node": 1,
+          "smt_siblings": [
+            18
+          ],
+          "socket_id": 1
+        },
+        "19": {
+          "core_id": 7,
+          "numa_node": 1,
+          "smt_siblings": [
+            19
+          ],
+          "socket_id": 1
+        },
+        "2": {
+          "core_id": 2,
+          "numa_node": 0,
+          "smt_siblings": [
+            2,
+            8
+          ],
+          "socket_id": 0
+        },
+        "3": {
+          "core_id": 3,
+          "numa_node": 0,
+          "smt_siblings": [
+            3,
+            9
+          ],
+          "socket_id": 0
+        },
+        "4": {
+          "core_id": 4,
+          "numa_node": 0,
+          "smt_siblings": [
+            4,
+            10
+          ],
+          "socket_id": 0
+        },
+        "5": {
+          "core_id": 5,
+          "numa_node": 0,
+          "smt_siblings": [
+            5,
+            11
+          ],
+          "socket_id": 0
+        },
+        "6": {
+          "core_id": 0,
+          "numa_node": 0,
+          "smt_siblings": [
+            0,
+            6
+          ],
+          "socket_id": 0
+        },
+        "7": {
+          "core_id": 1,
+          "numa_node": 0,
+          "smt_siblings": [
+            1,
+            7
+          ],
+          "socket_id": 0
+        },
+        "8": {
+          "core_id": 2,
+          "numa_node": 0,
+          "smt_siblings": [
+            2,
+            8
+          ],
+          "socket_id": 0
+        },
+        "9": {
+          "core_id": 3,
+          "numa_node": 0,
+          "smt_siblings": [
+            3,
+            9
+          ],
+          "socket_id": 0
+        }
+      },
+      "documentation_address": "192.0.2.10",
+      "gpus": {
+        "0": {
+          "numa_node": 0,
+          "uuid": "GPU-FAKE-A",
+          "vram_bytes": 17179869184
+        },
+        "1": {
+          "numa_node": 1,
+          "uuid": "GPU-FAKE-A-1",
+          "vram_bytes": 17179869184
+        }
+      },
+      "nics": {
+        "eth0": {
+          "ethernet_frame_overhead_bytes": 18,
+          "mac_address": "02:00:00:00:00:0a",
+          "mtu": 9000,
+          "physical_port": "port-a",
+          "rdma_device": "mlx5_fake_a",
+          "supported_match_fields": [
+            "destination_ip",
+            "destination_port",
+            "protocol",
+            "source_ip",
+            "source_port"
+          ],
+          "transport_overhead_bytes": 28,
+          "verbs_port": 1
+        }
+      },
+      "physical_host_id": "fake-host-a",
+      "ram_bytes": 17179869184,
+      "wire_profiles": [
+        "project-vdif-v1"
+      ]
+    },
+    {
+      "aliases": [
+        "node-b",
+        "fake-host-b"
+      ],
+      "cpus": {
+        "0": {
+          "core_id": 0,
+          "numa_node": 0,
+          "smt_siblings": [
+            0,
+            6
+          ],
+          "socket_id": 0
+        },
+        "1": {
+          "core_id": 1,
+          "numa_node": 0,
+          "smt_siblings": [
+            1,
+            7
+          ],
+          "socket_id": 0
+        },
+        "10": {
+          "core_id": 4,
+          "numa_node": 0,
+          "smt_siblings": [
+            4,
+            10
+          ],
+          "socket_id": 0
+        },
+        "11": {
+          "core_id": 5,
+          "numa_node": 0,
+          "smt_siblings": [
+            5,
+            11
+          ],
+          "socket_id": 0
+        },
+        "12": {
+          "core_id": 0,
+          "numa_node": 1,
+          "smt_siblings": [
+            12
+          ],
+          "socket_id": 1
+        },
+        "13": {
+          "core_id": 1,
+          "numa_node": 1,
+          "smt_siblings": [
+            13
+          ],
+          "socket_id": 1
+        },
+        "14": {
+          "core_id": 2,
+          "numa_node": 1,
+          "smt_siblings": [
+            14
+          ],
+          "socket_id": 1
+        },
+        "15": {
+          "core_id": 3,
+          "numa_node": 1,
+          "smt_siblings": [
+            15
+          ],
+          "socket_id": 1
+        },
+        "16": {
+          "core_id": 4,
+          "numa_node": 1,
+          "smt_siblings": [
+            16
+          ],
+          "socket_id": 1
+        },
+        "17": {
+          "core_id": 5,
+          "numa_node": 1,
+          "smt_siblings": [
+            17
+          ],
+          "socket_id": 1
+        },
+        "18": {
+          "core_id": 6,
+          "numa_node": 1,
+          "smt_siblings": [
+            18
+          ],
+          "socket_id": 1
+        },
+        "19": {
+          "core_id": 7,
+          "numa_node": 1,
+          "smt_siblings": [
+            19
+          ],
+          "socket_id": 1
+        },
+        "2": {
+          "core_id": 2,
+          "numa_node": 0,
+          "smt_siblings": [
+            2,
+            8
+          ],
+          "socket_id": 0
+        },
+        "3": {
+          "core_id": 3,
+          "numa_node": 0,
+          "smt_siblings": [
+            3,
+            9
+          ],
+          "socket_id": 0
+        },
+        "4": {
+          "core_id": 4,
+          "numa_node": 0,
+          "smt_siblings": [
+            4,
+            10
+          ],
+          "socket_id": 0
+        },
+        "5": {
+          "core_id": 5,
+          "numa_node": 0,
+          "smt_siblings": [
+            5,
+            11
+          ],
+          "socket_id": 0
+        },
+        "6": {
+          "core_id": 0,
+          "numa_node": 0,
+          "smt_siblings": [
+            0,
+            6
+          ],
+          "socket_id": 0
+        },
+        "7": {
+          "core_id": 1,
+          "numa_node": 0,
+          "smt_siblings": [
+            1,
+            7
+          ],
+          "socket_id": 0
+        },
+        "8": {
+          "core_id": 2,
+          "numa_node": 0,
+          "smt_siblings": [
+            2,
+            8
+          ],
+          "socket_id": 0
+        },
+        "9": {
+          "core_id": 3,
+          "numa_node": 0,
+          "smt_siblings": [
+            3,
+            9
+          ],
+          "socket_id": 0
+        }
+      },
+      "documentation_address": "192.0.2.11",
+      "gpus": {
+        "0": {
+          "numa_node": 0,
+          "uuid": "GPU-FAKE-B",
+          "vram_bytes": 17179869184
+        }
+      },
+      "nics": {
+        "eth0": {
+          "ethernet_frame_overhead_bytes": 18,
+          "mac_address": "02:00:00:00:00:0b",
+          "mtu": 9000,
+          "physical_port": "port-b",
+          "rdma_device": "mlx5_fake_b",
+          "supported_match_fields": [
+            "destination_ip",
+            "destination_port",
+            "protocol",
+            "source_ip",
+            "source_port"
+          ],
+          "transport_overhead_bytes": 28,
+          "verbs_port": 1
+        }
+      },
+      "physical_host_id": "fake-host-b",
+      "ram_bytes": 17179869184,
+      "wire_profiles": [
+        "project-vdif-v1"
+      ]
+    }
+  ],
+  "schema_version": 1
+}

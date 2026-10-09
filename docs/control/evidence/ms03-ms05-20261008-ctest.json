@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "kind": "coordinator_retrieved_ctest_evidence",
+  "executor_thread": "019fbb68-ae6f-77f0-bfdd-30bc30bd6c45",
+  "executor_turn": "01a11ba2-5eb9-7150-88a6-7d35c3d7e104",
+  "provenance": "Exact command outputs retrieved using read_thread; not reconstructed CTest LastTest.log.",
+  "source_manifest_sha256": "fa0483687947d874146dc276afe69eadf4d2ec241b4cd372ca90a27d09ca7553",
+  "tests": [
+    {
+      "test_name": "multiserver_model_test",
+      "command_id": "exec-b9dec878-1d24-41ec-82e8-14d44f7d75e0",
+      "command": "/bin/zsh -lc '/usr/bin/ssh HF -- ssh qths1 -- /home/user/wy/tools/cmake-3.31.12/bin/ctest --test-dir /home/user/wy/build-multiserver-config-20261008 --repeat until-fail:3 --output-on-failure -R multiserver_model_test'",
+      "exit_code": 0,
+      "output": "Internal ctest changing into directory: /home/user/wy/build-multiserver-config-20261008\nTest project /home/user/wy/build-multiserver-config-20261008\n    Start 24: multiserver_model_test\n    Test #24: multiserver_model_test ...........   Passed    0.16 sec\n    Start 24: multiserver_model_test\n    Test #24: multiserver_model_test ...........   Passed    0.16 sec\n    Start 24: multiserver_model_test\n1/1 Test #24: multiserver_model_test ...........   Passed    0.14 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   0.49 sec\n"
+    },
+    {
+      "test_name": "multiserver_deployment_test",
+      "command_id": "exec-4bdc6b9f-ec49-40ff-a1b1-d99cb46d3653",
+      "command": "/bin/zsh -lc '/usr/bin/ssh HF -- ssh qths1 -- /home/user/wy/tools/cmake-3.31.12/bin/ctest --test-dir /home/user/wy/build-multiserver-config-20261008 --repeat until-fail:3 --output-on-failure -R multiserver_deployment_test'",
+      "exit_code": 0,
+      "output": "Internal ctest changing into directory: /home/user/wy/build-multiserver-config-20261008\nTest project /home/user/wy/build-multiserver-config-20261008\n    Start 25: multiserver_deployment_test\n    Test #25: multiserver_deployment_test ......   Passed    0.30 sec\n    Start 25: multiserver_deployment_test\n    Test #25: multiserver_deployment_test ......   Passed    0.27 sec\n    Start 25: multiserver_deployment_test\n1/1 Test #25: multiserver_deployment_test ......   Passed    0.24 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   0.82 sec\n"
+    },
+    {
+      "test_name": "multiserver_weights_test",
+      "command_id": "exec-967f13e4-b63e-4cb9-9537-e3434b1e6303",
+      "command": "/bin/zsh -lc '/usr/bin/ssh HF -- ssh qths1 -- /home/user/wy/tools/cmake-3.31.12/bin/ctest --test-dir /home/user/wy/build-multiserver-config-20261008 --repeat until-fail:3 --output-on-failure -R multiserver_weights_test'",
+      "exit_code": 0,
+      "output": "Internal ctest changing into directory: /home/user/wy/build-multiserver-config-20261008\nTest project /home/user/wy/build-multiserver-config-20261008\n    Start 26: multiserver_weights_test\n    Test #26: multiserver_weights_test .........   Passed    0.37 sec\n    Start 26: multiserver_weights_test\n    Test #26: multiserver_weights_test .........   Passed    0.35 sec\n    Start 26: multiserver_weights_test\n1/1 Test #26: multiserver_weights_test .........   Passed    0.31 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   1.05 sec\n"
+    },
+    {
+      "test_name": "multiserver_bundle_test",
+      "command_id": "exec-63ab805b-4b96-4dde-a6ab-aec4c2d587d9",
+      "command": "/bin/zsh -lc '/usr/bin/ssh HF -- ssh qths1 -- /home/user/wy/tools/cmake-3.31.12/bin/ctest --test-dir /home/user/wy/build-multiserver-config-20261008 --repeat until-fail:3 --output-on-failure -R multiserver_bundle_test'",
+      "exit_code": 0,
+      "output": "Internal ctest changing into directory: /home/user/wy/build-multiserver-config-20261008\nTest project /home/user/wy/build-multiserver-config-20261008\n    Start 27: multiserver_bundle_test\n    Test #27: multiserver_bundle_test ..........   Passed    1.54 sec\n    Start 27: multiserver_bundle_test\n    Test #27: multiserver_bundle_test ..........   Passed    1.60 sec\n    Start 27: multiserver_bundle_test\n1/1 Test #27: multiserver_bundle_test ..........   Passed    1.58 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   4.73 sec\n"
+    },
+    {
+      "test_name": "multiserver_compiler_unit_test",
+      "command_id": "exec-cff4c795-ace9-45a1-bb59-76b9b04179ce",
+      "command": "/bin/zsh -lc '/usr/bin/ssh HF -- ssh qths1 -- /home/user/wy/tools/cmake-3.31.12/bin/ctest --test-dir /home/user/wy/build-multiserver-config-20261008 --repeat until-fail:3 --output-on-failure -R multiserver_compiler_unit_test'",
+      "exit_code": 0,
+      "output": "Internal ctest changing into directory: /home/user/wy/build-multiserver-config-20261008\nTest project /home/user/wy/build-multiserver-config-20261008\n    Start 28: multiserver_compiler_unit_test\n    Test #28: multiserver_compiler_unit_test ...   Passed    1.11 sec\n    Start 28: multiserver_compiler_unit_test\n    Test #28: multiserver_compiler_unit_test ...   Passed    1.09 sec\n    Start 28: multiserver_compiler_unit_test\n1/1 Test #28: multiserver_compiler_unit_test ...   Passed    1.15 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   3.36 sec\n"
+    },
+    {
+      "test_name": "multiserver_compile_test",
+      "command_id": "exec-e2a2d359-66cf-4bfc-b5bb-d491ba6f5ccd",
+      "command": "/bin/zsh -lc '/usr/bin/ssh HF -- ssh qths1 -- /home/user/wy/tools/cmake-3.31.12/bin/ctest --test-dir /home/user/wy/build-multiserver-config-20261008 --repeat until-fail:3 --output-on-failure -R multiserver_compile_test'",
+      "exit_code": 0,
+      "output": "Internal ctest changing into directory: /home/user/wy/build-multiserver-config-20261008\nTest project /home/user/wy/build-multiserver-config-20261008\n    Start 29: multiserver_compile_test\n    Test #29: multiserver_compile_test .........   Passed    2.23 sec\n    Start 29: multiserver_compile_test\n    Test #29: multiserver_compile_test .........   Passed    2.16 sec\n    Start 29: multiserver_compile_test\n1/1 Test #29: multiserver_compile_test .........   Passed    2.20 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   6.61 sec\n"
+    },
+    {
+      "test_name": "observation_config_test",
+      "command_id": "exec-0d416975-36a2-4192-ac32-ecb6c82b0f54",
+      "command": "/bin/zsh -lc '/usr/bin/ssh HF -- ssh qths1 -- /home/user/wy/tools/cmake-3.31.12/bin/ctest --test-dir /home/user/wy/build-multiserver-config-20261008 --repeat until-fail:3 --output-on-failure -R observation_config_test'",
+      "exit_code": 0,
+      "output": "Internal ctest changing into directory: /home/user/wy/build-multiserver-config-20261008\nTest project /home/user/wy/build-multiserver-config-20261008\n    Start 16: observation_config_test\n    Test #16: observation_config_test ..........   Passed    0.01 sec\n    Start 16: observation_config_test\n    Test #16: observation_config_test ..........   Passed    0.01 sec\n    Start 16: observation_config_test\n1/1 Test #16: observation_config_test ..........   Passed    0.01 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   0.04 sec\n"
+    },
+    {
+      "test_name": "resolved_observation_plan_test",
+      "command_id": "exec-bedfa3eb-16c1-4021-8339-4029ab664e5f",
+      "command": "/bin/zsh -lc '/usr/bin/ssh HF -- ssh qths1 -- /home/user/wy/tools/cmake-3.31.12/bin/ctest --test-dir /home/user/wy/build-multiserver-config-20261008 --repeat until-fail:3 --output-on-failure -R resolved_observation_plan_test'",
+      "exit_code": 0,
+      "output": "Internal ctest changing into directory: /home/user/wy/build-multiserver-config-20261008\nTest project /home/user/wy/build-multiserver-config-20261008\n    Start 17: resolved_observation_plan_test\n    Test #17: resolved_observation_plan_test ...   Passed    0.02 sec\n    Start 17: resolved_observation_plan_test\n    Test #17: resolved_observation_plan_test ...   Passed    0.01 sec\n    Start 17: resolved_observation_plan_test\n1/1 Test #17: resolved_observation_plan_test ...   Passed    0.01 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   0.03 sec\n"
+    },
+    {
+      "test_name": "observation_artifacts_test",
+      "command_id": "exec-8816c8a7-6556-4170-9d27-ba5557a42fcf",
+      "command": "/bin/zsh -lc '/usr/bin/ssh HF -- ssh qths1 -- /home/user/wy/tools/cmake-3.31.12/bin/ctest --test-dir /home/user/wy/build-multiserver-config-20261008 --repeat until-fail:3 --output-on-failure -R observation_artifacts_test'",
+      "exit_code": 0,
+      "output": "Internal ctest changing into directory: /home/user/wy/build-multiserver-config-20261008\nTest project /home/user/wy/build-multiserver-config-20261008\n    Start 19: observation_artifacts_test\n    Test #19: observation_artifacts_test .......   Passed    0.12 sec\n    Start 19: observation_artifacts_test\n    Test #19: observation_artifacts_test .......   Passed    0.12 sec\n    Start 19: observation_artifacts_test\n1/1 Test #19: observation_artifacts_test .......   Passed    0.11 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   0.35 sec\n"
+    },
+    {
+      "test_name": "beamform_weight_metadata_test",
+      "command_id": "exec-5449c5ca-02be-4ca7-a4e5-82637d0762f4",
+      "command": "/bin/zsh -lc '/usr/bin/ssh HF -- ssh qths1 -- /home/user/wy/tools/cmake-3.31.12/bin/ctest --test-dir /home/user/wy/build-multiserver-config-20261008 --repeat until-fail:3 --output-on-failure -R beamform_weight_metadata_test'",
+      "exit_code": 0,
+      "output": "Internal ctest changing into directory: /home/user/wy/build-multiserver-config-20261008\nTest project /home/user/wy/build-multiserver-config-20261008\n    Start 46: beamform_weight_metadata_test\n    Test #46: beamform_weight_metadata_test ....   Passed    0.01 sec\n    Start 46: beamform_weight_metadata_test\n    Test #46: beamform_weight_metadata_test ....   Passed    0.00 sec\n    Start 46: beamform_weight_metadata_test\n1/1 Test #46: beamform_weight_metadata_test ....   Passed    0.00 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   0.02 sec\n"
+    },
+    {
+      "test_name": "observation_config_compile_test",
+      "command_id": "exec-0e339f7d-8a57-478e-b1d1-6b8bd3aebc59",
+      "command": "/bin/zsh -lc '/usr/bin/ssh HF -- ssh qths1 -- /home/user/wy/tools/cmake-3.31.12/bin/ctest --test-dir /home/user/wy/build-multiserver-config-20261008 --repeat until-fail:3 --output-on-failure -R observation_config_compile_test'",
+      "exit_code": 0,
+      "output": "Internal ctest changing into directory: /home/user/wy/build-multiserver-config-20261008\nTest project /home/user/wy/build-multiserver-config-20261008\n    Start 30: observation_config_compile_test\n    Test #30: observation_config_compile_test ...   Passed    0.19 sec\n    Start 30: observation_config_compile_test\n    Test #30: observation_config_compile_test ...   Passed    0.19 sec\n    Start 30: observation_config_compile_test\n1/1 Test #30: observation_config_compile_test ...   Passed    0.19 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   0.57 sec\n"
+    }
+  ],
+  "note": "11 suites, three visible passes per suite. Remote LastTest.log retains only the latest CTest invocation."
+}

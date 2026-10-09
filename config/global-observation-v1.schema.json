@@ -4,9 +4,14 @@
   "title": "RDMA/DADA global multi-server observation configuration v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "observation", "channels", "wire", "time_grid", "processing", "assignments", "monitoring"],
+  "required": ["schema_version", "metadata", "observation", "channels", "wire", "time_grid", "processing", "assignments", "monitoring"],
   "properties": {
     "schema_version": { "const": 1 },
+    "metadata": {
+      "type": "object", "additionalProperties": false,
+      "required": ["telescope"],
+      "properties": { "telescope": { "type": "string", "minLength": 1 } }
+    },
     "observation": {
       "type": "object", "additionalProperties": false,
       "required": ["observation_id", "utc_start", "duration_seconds", "station_ids", "npol", "sample_interval_ps"],

@@ -1,6 +1,6 @@
 # Multi-server Configuration Implementation Plan — Phase 1
 
-> **For agentic workers:** The coordinator dispatches bounded work to persistent Luna conversations under `docs/agents/delegated-development.md`. Each child uses superpowers:executing-plans for its approved scope and runs red/green checks task by task. Do not automatically commit/push or modify the paper branch.
+> **For agentic workers:** The coordinator dispatches bounded work to persistent conversations using the current model/effort policy in `docs/agents/delegated-development.md`. Each child uses superpowers:executing-plans for its approved scope and runs red/green checks task by task. Do not automatically commit/push or modify the paper branch.
 
 **Goal:** Compile user frequency assignments and a full weight matrix into deterministic per-GPU bundles compatible with the existing Observation compiler.
 
@@ -12,6 +12,12 @@
 
 ## Global Constraints
 
+Current checkpoint (2026-10-08): Tasks1–5 have passed scoped offline server
+acceptance and are integrated into the feature worktree. Tasks1/2 were previously
+committed; Tasks3–5 and parameter refinements await the user's Git decision.
+The step checklists below retain the original execution recipe, not outstanding
+work. See `docs/control/ms03-ms05-acceptance.md` for evidence and runtime limits.
+
 - Work only in `/Users/ywang/WorkFile/code/rdma_dada/.worktrees/multi-server-observation`, branch `codex/multi-server-observation`, starting at `febdc0ee4587d5c8bd3b9f8466bbc954e1204389`.
 - Preserve the parent paper branch and its uncommitted numerical-suite work. Do not merge the GPU-only branch.
 - Do not edit current Observation v1 schema, existing fixture JSON, algorithm code or accepted paper indexes in this phase.
@@ -22,6 +28,46 @@
 - Source schema identifiers in this new feature must not rename or rewrite existing paper configuration IDs.
 
 ## Files and interfaces
+
+### Approved parameter refinement — 2026-10-08
+
+The current implementation base is `5851eaed` on the feature branch; the initial
+revision in Global Constraints above is historical. MS-03 and MS-04a/4b passed
+independent local review; their server acceptance is pending. MS-05 consumes the
+reviewed bundle snapshot for real compiler compatibility and test registration.
+See `docs/control/task-ledger.md` for current task states and handoffs.
+
+- Add global `metadata.telescope`; the example is `CA`. Retain the existing
+  `first_center_frequency_hz` input rather than two competing frequency fields.
+  Desired full-band center is 1,300,000,000 Hz and spacing 1,000,000 Hz: derive
+  first center as `center - (global_nchan - 1) * spacing / 2`, using exact Hz.
+  For F7 the example first center is 1,297,000,000 Hz. Local centers/bandwidths
+  follow the assignments; sampling interval remains a separate input.
+- Supply an inventory JSON explicitly, not through remote discovery or a fake
+  production inventory. Change the planned bundle API to
+  `build_bundle(global_path, deployment_path, output, *, inventory_path)` and
+  CLI `compile --global FILE --deployments FILE --inventory FILE --output DIR`.
+- Profiles add receiver device/destination MAC and explicit storage settings.
+  Inventory maps each interface to its RDMA device, verbs port and MAC. Validate
+  the mapping; do not infer `mlx5_0` from an interface name. The existing runtime
+  supports verbs port 1 only: reject other ports on selected interfaces before
+  generating a bundle; unused inventory NICs may describe other positive ports.
+  Multiple cards can be selected explicitly; no NIC speed/FEC changes.
+- Current storage is `enabled=false, blocks_per_file=0, direct_io=false`, with
+  output-ring/dbnull consumption. Do not implement disk-control behavior here.
+- Identical hardware can reuse the example profile layout, with explicit
+  per-host/per-GPU resource values. Keep expanded profiles for this first
+  implementation; a template inheritance engine is not required. Existing
+  same-host CPU/core, GPU, flow, ring and path isolation still applies.
+- Tests use deterministic signed weight fixtures of shape `[F,P,A,B,2]`, then
+  byte-preserving F slices. Production still accepts a supplied full matrix;
+  fixture generation is not physical beam calibration.
+
+MS-04a red/green gates cover the new fields, missing/contradictory NIC mapping,
+unsupported verbs port, disabled-storage contract and 1.3 GHz F7/F4 examples.
+MS-04b retains all original determinism, path and failure tests. MS-05 checks
+the generated JSON through the unchanged existing compiler. New pure tests are
+combined for server acceptance, not repeated as separate performance campaigns.
 
 All paths below are relative to this feature worktree.
 
@@ -52,7 +98,7 @@ The planned pure function signatures are:
 validate_global(document: dict) -> dict
 validate_deployment(global_plan: dict, profiles: dict, inventory: dict) -> dict
 slice_weights(source: Path, destination: Path, first_f: int, nchan: int) -> dict
-build_bundle(global_path: Path, deployment_path: Path, output: Path) -> dict
+build_bundle(global_path: Path, deployment_path: Path, output: Path, *, inventory_path: Path) -> dict
 resolve_instance(instance_directory: Path, compiler: Path, output: Path) -> dict
 ```
 
@@ -63,7 +109,7 @@ Fixture contract in `tests/multiserver_fixture.py`:
 - `global_example()` returns a fresh dict for A4/F7/P1/B2, Stations 1000–1003, channels 100–106, d=1,000,000 ps, S=512, T=16,384, K=128 MEAN, duration `1.048576`, allocations node-a/gpu0 F4 and node-b/gpu0 F3.
 - `deployment_example()` returns independent receiver/worker/GPU/sink CPU lists, CUDA mode/slots, rings/counts, output consumer and receiver endpoint values; examples are not authorized remote launch configs.
 - `inventory_example()` returns fake CPU socket/core/logical maps, GPU UUIDs and capacity/MTU constraints for tests. Real inventory is a later Phase 0 input, not a hardcoded test map used in production.
-- `write_example_inputs(root)` writes the example JSON resources and NPY and returns `(global_path, deployment_path)`.
+- `write_example_inputs(root)` writes the example JSON resources and NPY and returns `(global_path, deployment_path, inventory_path)`.
 - `write_weight_fixture(path, shape, dtype)` writes NPY with channel-distinct signed integer values; it returns the full raw payload bytes for independent byte-slice assertions. Do not reuse the production slicer to generate expected sliced bytes.
 
 The checked-in example becomes a precise expanded form of the spec's conceptual resource references: a weight object contains relative `path`, `order=FPAB2`, `weights_id`, `weights_scale` and `compute_mode`; the common processing section retains the explicit conversion/product/integration settings. The deployment document supplies metadata, storage, ring and execution fields required by current Observation v1. Missing required profile fields fail, not silently inherit a test-runner default.
@@ -187,8 +233,8 @@ class BundleTest(unittest.TestCase):
     def test_geometry_inputs_not_user_byte_overrides(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
-            global_path, profiles = write_example_inputs(root)
-            result = build_bundle(global_path, profiles, root/'bundle')
+            global_path, profiles, inventory = write_example_inputs(root)
+            result = build_bundle(global_path, profiles, root/'bundle', inventory_path=inventory)
             self.assertEqual(len(result['instances']), 2)
             self.assertEqual(result['time_grid']['samples_per_block'], 16384)
             self.assertTrue((root/'bundle'/'MANIFEST.sha256').is_file())
@@ -232,7 +278,7 @@ completed = subprocess.run(argv, stdout=subprocess.PIPE,
 ## Expected local command interface after implementation
 
 ```text
-python3 -B scripts/multiserver_compile.py compile --global FILE --deployments FILE --output DIR
+python3 -B scripts/multiserver_compile.py compile --global FILE --deployments FILE --inventory FILE --output DIR
 python3 -B scripts/multiserver_compile.py resolve --instance-dir DIR --compiler BINARY --output DIR
 python3 -B -m unittest discover -s tests -p 'multiserver_model_test.py' -v
 python3 -B -m unittest discover -s tests -p 'multiserver_deployment_test.py' -v

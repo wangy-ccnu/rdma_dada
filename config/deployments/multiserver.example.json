@@ -53,6 +53,15 @@
           "protocol": "UDP"
         }
       },
+      "receiver": {
+        "device": "mlx5_fake_a",
+        "destination_mac": "02:00:00:00:00:0a"
+      },
+      "storage": {
+        "enabled": false,
+        "blocks_per_file": 0,
+        "direct_io": false
+      },
       "paths": {
         "run_dir": "runs/node-a-gpu0",
         "log_dir": "logs/node-a-gpu0"
@@ -126,6 +135,15 @@
           "destination_port": 10001,
           "protocol": "UDP"
         }
+      },
+      "receiver": {
+        "device": "mlx5_fake_b",
+        "destination_mac": "02:00:00:00:00:0b"
+      },
+      "storage": {
+        "enabled": false,
+        "blocks_per_file": 0,
+        "direct_io": false
       },
       "paths": {
         "run_dir": "runs/node-b-gpu0",

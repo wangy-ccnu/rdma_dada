@@ -28,6 +28,10 @@ def use_second_gpu_on_node_a(deployments, source):
     profile["paths"] = {"run_dir": "runs/node-a-gpu1", "log_dir": "logs/node-a-gpu1"}
     profile["rings"] = {"raw_key": "0x1101", "compute_key": "0x1102", "output_key": "0x1103"}
     profile["flow"]["physical_port"] = "port-a"
+    profile["receiver"] = {
+        "device": "mlx5_fake_a",
+        "destination_mac": "02:00:00:00:00:0a",
+    }
     source["assignments"][1].update({"server_id": "node-a", "gpu_id": 1})
 
 
@@ -42,6 +46,83 @@ class DeploymentTest(unittest.TestCase):
     def assert_invalid(self, deployments, inventory, code, source=None):
         with self.assertRaisesRegex(ValueError, r"\b" + code + r"\b"):
             self.checked(deployments, inventory, source)
+
+    def test_explicit_receiver_and_nic_mapping_is_preserved(self):
+        checked = self.checked()
+        receiver = checked["instances"][0]["receiver"]
+        self.assertEqual(receiver["device"], "mlx5_fake_a")
+        self.assertEqual(receiver["destination_mac"], "02:00:00:00:00:0a")
+
+    def test_unknown_receiver_device_is_rejected(self):
+        deployments = deployment_example()
+        deployments["profiles"]["example-node-a-gpu0"]["receiver"]["device"] = "mlx5_missing"
+        self.assert_invalid(deployments, inventory_example(), "RDMA_DEVICE_MISMATCH")
+
+    def test_receiver_mac_and_physical_port_must_match_inventory(self):
+        deployments = deployment_example()
+        deployments["profiles"]["example-node-a-gpu0"]["receiver"]["destination_mac"] = "02:00:00:00:00:ff"
+        self.assert_invalid(deployments, inventory_example(), "NIC_MAC_MISMATCH")
+        deployments = deployment_example()
+        deployments["profiles"]["example-node-a-gpu0"]["receiver"]["destination_mac"] = "not-a-mac"
+        self.assert_invalid(deployments, inventory_example(), "INVALID_MAC")
+        deployments = deployment_example()
+        deployments["profiles"]["example-node-a-gpu0"]["receiver"]["destination_mac"] = "02:00:00:00:00:0A"
+        self.assertEqual(len(self.checked(deployments, inventory_example())["instances"]), 2)
+        deployments = deployment_example()
+        deployments["profiles"]["example-node-a-gpu0"]["flow"]["physical_port"] = "port-wrong"
+        self.assert_invalid(deployments, inventory_example(), "NIC_PORT_MISMATCH")
+
+    def test_verbs_port_two_is_explicitly_unsupported(self):
+        inventory = inventory_example()
+        inventory["hosts"][0]["nics"]["eth0"]["verbs_port"] = 2
+        self.assert_invalid(deployment_example(), inventory, "UNSUPPORTED_VERBS_PORT")
+
+    def test_unused_verbs_port_two_does_not_reject_selected_port_one(self):
+        inventory = inventory_example()
+        unused = copy.deepcopy(inventory["hosts"][0]["nics"]["eth0"])
+        unused.update({
+            "physical_port": "port-unused",
+            "rdma_device": "mlx5_fake_unused",
+            "verbs_port": 2,
+            "mac_address": "02:00:00:00:00:0c",
+        })
+        inventory["hosts"][0]["nics"]["eth1"] = unused
+        before = copy.deepcopy(inventory)
+        checked = self.checked(inventory=inventory)
+        self.assertEqual(len(checked["instances"]), 2)
+        self.assertEqual(checked["instances"][0]["flow"]["interface"], "eth0")
+        self.assertEqual(inventory, before)
+
+    def test_selected_second_interface_verbs_port_two_is_unsupported(self):
+        deployments = deployment_example()
+        inventory = inventory_example()
+        second = copy.deepcopy(inventory["hosts"][0]["nics"]["eth0"])
+        second.update({
+            "physical_port": "port-second",
+            "rdma_device": "mlx5_fake_second",
+            "verbs_port": 2,
+            "mac_address": "02:00:00:00:00:0c",
+        })
+        inventory["hosts"][0]["nics"]["eth1"] = second
+        profile = deployments["profiles"]["example-node-a-gpu0"]
+        profile["flow"].update({"interface": "eth1", "physical_port": "port-second"})
+        profile["receiver"].update({
+            "device": "mlx5_fake_second",
+            "destination_mac": "02:00:00:00:00:0c",
+        })
+        with self.assertRaisesRegex(ValueError, r"UNSUPPORTED_VERBS_PORT.*example-node-a-gpu0.*eth1"):
+            self.checked(deployments, inventory)
+
+    def test_non_disabled_storage_settings_are_refused(self):
+        for field, value, code in (
+            ("enabled", True, "STORAGE_ENABLED_UNSUPPORTED"),
+            ("blocks_per_file", 1, "STORAGE_BLOCKS_UNSUPPORTED"),
+            ("direct_io", True, "DIRECT_IO_UNSUPPORTED"),
+        ):
+            deployments = deployment_example()
+            deployments["profiles"]["example-node-a-gpu0"]["storage"][field] = value
+            with self.subTest(field=field):
+                self.assert_invalid(deployments, inventory_example(), code)
 
     def test_gpu_zero_on_different_hosts_is_not_a_collision(self):
         checked = self.checked()
@@ -104,6 +185,10 @@ class DeploymentTest(unittest.TestCase):
         deployments = deployment_example()
         deployments["profiles"]["example-node-b-gpu0"]["server_id"] = "node-a"
         deployments["profiles"]["example-node-b-gpu0"]["gpu_id"] = 1
+        deployments["profiles"]["example-node-b-gpu0"]["receiver"] = {
+            "device": "mlx5_fake_a",
+            "destination_mac": "02:00:00:00:00:0a",
+        }
         inventory = inventory_example()
         inventory["hosts"][0]["gpus"]["1"] = copy.deepcopy(inventory["hosts"][0]["gpus"]["0"])
         source = global_example()

@@ -8,7 +8,7 @@ from pathlib import PurePosixPath
 
 _PROFILE_KEYS = (
     "server_id", "gpu_id", "cpu", "numa", "rings", "ring_counts", "flow",
-    "paths", "reservation", "execution", "consumer",
+    "receiver", "storage", "paths", "reservation", "execution", "consumer",
 )
 _CPU_ROLES = ("receiver", "unpack", "gpu", "workers", "sink", "control")
 _MATCH_FIELDS = {
@@ -17,6 +17,7 @@ _MATCH_FIELDS = {
 _RING_KEYS = ("raw_key", "compute_key", "output_key")
 _RING_COUNT_KEYS = ("raw", "compute", "output")
 _HEX_KEY_RE = re.compile("^0[xX][0-9a-fA-F]{1,8}$")
+_MAC_RE = re.compile(r"^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
 _WIRE_PROFILE_NAME = "project-vdif-v1"
 _KNOWN_WIRE_PROFILES = {"packet_formats/frontend.example-v1.json", _WIRE_PROFILE_NAME}
 
@@ -56,6 +57,19 @@ def _integer(value, path, minimum=0):
     if value < minimum:
         _error("INTEGER_RANGE", path, "must be at least {}".format(minimum))
     return value
+
+
+def _boolean(value, path):
+    if not isinstance(value, bool):
+        _error("INVALID_BOOLEAN", path, "expected boolean")
+    return value
+
+
+def _normalize_mac(value, path):
+    _string(value, path)
+    if not _MAC_RE.fullmatch(value):
+        _error("INVALID_MAC", path, "expected six-octet colon-separated MAC address")
+    return value.lower()
 
 
 def _integer_or_unknown(value, path):
@@ -204,11 +218,17 @@ def _validate_inventory(inventory):
             _string(interface, path + ".nics.interface")
             _exact_keys(
                 nic,
-                ("physical_port", "mtu", "transport_overhead_bytes", "ethernet_frame_overhead_bytes", "supported_match_fields"),
+                (
+                    "physical_port", "rdma_device", "verbs_port", "mac_address", "mtu",
+                    "transport_overhead_bytes", "ethernet_frame_overhead_bytes", "supported_match_fields",
+                ),
                 nic_path,
             )
             normalized_nics[interface] = {
                 "physical_port": _string(nic["physical_port"], nic_path + ".physical_port"),
+                "rdma_device": _string(nic["rdma_device"], nic_path + ".rdma_device"),
+                "verbs_port": _integer(nic["verbs_port"], nic_path + ".verbs_port", 1),
+                "mac_address": _normalize_mac(nic["mac_address"], nic_path + ".mac_address"),
                 "mtu": _integer(nic["mtu"], nic_path + ".mtu", 68),
                 "transport_overhead_bytes": _integer_or_unknown(nic["transport_overhead_bytes"], nic_path + ".transport_overhead_bytes"),
                 "ethernet_frame_overhead_bytes": _integer_or_unknown(nic["ethernet_frame_overhead_bytes"], nic_path + ".ethernet_frame_overhead_bytes"),
@@ -274,6 +294,30 @@ def _validate_profile(profile, path):
             else:
                 _string(value, path + ".flow.match." + field)
     _normalize_match(match, path + ".flow.match")
+    receiver = _object(profile["receiver"], path + ".receiver")
+    _exact_keys(receiver, ("device", "destination_mac"), path + ".receiver")
+    _string(receiver["device"], path + ".receiver.device")
+    _normalize_mac(receiver["destination_mac"], path + ".receiver.destination_mac")
+    storage = _object(profile["storage"], path + ".storage")
+    _exact_keys(storage, ("enabled", "blocks_per_file", "direct_io"), path + ".storage")
+    if _boolean(storage["enabled"], path + ".storage.enabled"):
+        _error(
+            "STORAGE_ENABLED_UNSUPPORTED",
+            path + ".storage.enabled",
+            "disk storage is disabled for this milestone",
+        )
+    if _integer(storage["blocks_per_file"], path + ".storage.blocks_per_file") != 0:
+        _error(
+            "STORAGE_BLOCKS_UNSUPPORTED",
+            path + ".storage.blocks_per_file",
+            "nonzero blocks_per_file is unsupported while storage is disabled",
+        )
+    if _boolean(storage["direct_io"], path + ".storage.direct_io"):
+        _error(
+            "DIRECT_IO_UNSUPPORTED",
+            path + ".storage.direct_io",
+            "direct I/O is unsupported while storage is disabled",
+        )
     paths = _object(profile["paths"], path + ".paths")
     _exact_keys(paths, ("run_dir", "log_dir"), path + ".paths")
     for field in ("run_dir", "log_dir"):
@@ -487,6 +531,26 @@ def validate_deployment(global_plan, profiles, inventory):
         nic = host["nics"].get(profile["flow"]["interface"])
         if nic is None:
             _error("NIC_NOT_IN_INVENTORY", profile_path + ".flow.interface", "interface is absent")
+        if nic["verbs_port"] != 1:
+            _error(
+                "UNSUPPORTED_VERBS_PORT",
+                profile_path + ".flow.interface",
+                "selected interface {} has verbs port {}; this runtime supports verbs port 1 only".format(
+                    profile["flow"]["interface"], nic["verbs_port"],
+                ),
+            )
+        if profile["receiver"]["device"] != nic["rdma_device"]:
+            _error(
+                "RDMA_DEVICE_MISMATCH",
+                profile_path + ".receiver.device",
+                "receiver device is not the selected inventory NIC's RDMA device",
+            )
+        if _normalize_mac(profile["receiver"]["destination_mac"], profile_path + ".receiver.destination_mac") != nic["mac_address"]:
+            _error(
+                "NIC_MAC_MISMATCH",
+                profile_path + ".receiver.destination_mac",
+                "receiver MAC differs from the selected inventory NIC",
+            )
         if nic["physical_port"] != profile["flow"]["physical_port"]:
             _error("NIC_PORT_MISMATCH", profile_path + ".flow.physical_port", "physical port differs from inventory")
         match = profile["flow"]["match"]

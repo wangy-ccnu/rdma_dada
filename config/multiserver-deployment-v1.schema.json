@@ -54,7 +54,7 @@
       "additionalProperties": false,
       "required": [
         "server_id", "gpu_id", "cpu", "numa", "rings", "ring_counts",
-        "flow", "paths", "reservation", "execution", "consumer"
+        "flow", "receiver", "storage", "paths", "reservation", "execution", "consumer"
       ],
       "properties": {
         "server_id": {"type": "string", "minLength": 1},
@@ -111,6 +111,23 @@
                 "protocol": {"$ref": "#/$defs/protocol_value"}
               }
             }
+          }
+        },
+        "receiver": {
+          "type": "object", "additionalProperties": false,
+          "required": ["device", "destination_mac"],
+          "properties": {
+            "device": { "type": "string", "minLength": 1 },
+            "destination_mac": { "type": "string", "pattern": "^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$" }
+          }
+        },
+        "storage": {
+          "type": "object", "additionalProperties": false,
+          "required": ["enabled", "blocks_per_file", "direct_io"],
+          "properties": {
+            "enabled": { "const": false },
+            "blocks_per_file": { "const": 0 },
+            "direct_io": { "const": false }
           }
         },
         "paths": {

@@ -1,9 +1,72 @@
 """Small, deterministic inputs for the multi-server configuration tests."""
 
+import struct
+import json
+from pathlib import Path
+
+
+def write_weight_fixture(path, shape, dtype, version=1, alignment=None):
+    """Write an independent deterministic NPY weight fixture.
+
+    The payload is generated in F/P/A/B/complex-component order and returned
+    separately so tests can derive expected byte slices without using the
+    production reader or slicer.
+    """
+    if len(shape) != 5 or shape[-1] != 2:
+        raise ValueError("fixture shape must be [F,P,A,B,2]")
+    if dtype == "|i1":
+        item_format = "<b"
+        modulus = 256
+        midpoint = 128
+    elif dtype == "<i2":
+        item_format = "<h"
+        modulus = 65536
+        midpoint = 32768
+    else:
+        raise ValueError("fixture dtype must be |i1 or <i2")
+    if version not in (1, 2):
+        raise ValueError("fixture version must be 1 or 2")
+
+    payload = bytearray()
+    for f in range(shape[0]):
+        for p in range(shape[1]):
+            for a in range(shape[2]):
+                for b in range(shape[3]):
+                    for component in range(shape[4]):
+                        ordinal = (((f * shape[1] + p) * shape[2] + a)
+                                   * shape[3] + b) * shape[4] + component
+                        value = (ordinal * 17 + f * 31 + component * 7) % modulus
+                        payload.extend(struct.pack(item_format, value - midpoint))
+
+    header = "{'descr': %r, 'fortran_order': False, 'shape': %r, }" % (
+        dtype, tuple(shape))
+    header_bytes = header.encode("ascii")
+    prefix_bytes = 10 if version == 1 else 12
+    if alignment is None:
+        alignment = 16 if version == 1 else 64
+    if alignment not in (16, 64):
+        raise ValueError("fixture alignment must be 16 or 64")
+    padding = alignment - ((prefix_bytes + len(header_bytes) + 1) % alignment)
+    if padding == alignment:
+        padding = 0
+    header_bytes += b" " * padding + b"\n"
+
+    prefix = b"\x93NUMPY" + bytes((version, 0))
+    if version == 1:
+        if len(header_bytes) > 0xFFFF:
+            raise ValueError("fixture NPY v1 header is too large")
+        prefix += struct.pack("<H", len(header_bytes))
+    else:
+        prefix += struct.pack("<I", len(header_bytes))
+    path.write_bytes(prefix + header_bytes + payload)
+    return bytes(payload)
+
+
 def global_example():
     """Return a fresh seven-channel global observation input."""
     return {
         "schema_version": 1,
+        "metadata": {"telescope": "CA"},
         "observation": {
             "observation_id": "multi-server-layout-example",
             "utc_start": "2026-09-12-00:00:00",
@@ -15,7 +78,7 @@ def global_example():
         "channels": {
             "first_channel_id": 100,
             "nchan": 7,
-            "first_center_frequency_hz": 1_200_000_000,
+            "first_center_frequency_hz": 1_297_000_000,
             "channel_spacing_hz": 1_000_000,
         },
         "wire": {
@@ -59,6 +122,27 @@ def global_example():
     }
 
 
+def write_example_inputs(root):
+    """Write independent documentation-only inputs and actual local resources."""
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+    global_path = root / "global.json"
+    deployment_path = root / "deployments.json"
+    inventory_path = root / "inventory.json"
+    for path, document in (
+        (global_path, global_example()),
+        (deployment_path, deployment_example()),
+        (inventory_path, inventory_example()),
+    ):
+        path.write_text(json.dumps(document, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    (root / "weights").mkdir(exist_ok=True)
+    write_weight_fixture(root / "weights/global-f7-p1-a4-b2.npy", (7, 1, 4, 2, 2), "|i1")
+    (root / "packet_formats").mkdir(exist_ok=True)
+    wire = Path(__file__).resolve().parents[1] / "config/packet_formats/frontend.example-v1.json"
+    (root / "packet_formats/frontend.example-v1.json").write_bytes(wire.read_bytes())
+    return global_path, deployment_path, inventory_path
+
+
 def deployment_example():
     """Return explicit, non-runnable deployment profiles for two fake hosts."""
     return {
@@ -98,6 +182,15 @@ def deployment_example():
                         "destination_port": 10000,
                         "protocol": "UDP",
                     },
+                },
+                "receiver": {
+                    "device": "mlx5_fake_a",
+                    "destination_mac": "02:00:00:00:00:0a",
+                },
+                "storage": {
+                    "enabled": False,
+                    "blocks_per_file": 0,
+                    "direct_io": False,
                 },
                 "paths": {
                     "run_dir": "runs/node-a-gpu0",
@@ -156,6 +249,15 @@ def deployment_example():
                         "protocol": "UDP",
                     },
                 },
+                "receiver": {
+                    "device": "mlx5_fake_b",
+                    "destination_mac": "02:00:00:00:00:0b",
+                },
+                "storage": {
+                    "enabled": False,
+                    "blocks_per_file": 0,
+                    "direct_io": False,
+                },
                 "paths": {
                     "run_dir": "runs/node-b-gpu0",
                     "log_dir": "logs/node-b-gpu0",
@@ -204,7 +306,7 @@ def inventory_example():
             }
         return result
 
-    def host(physical_host_id, alias, gpu_uuid, port, destination):
+    def host(physical_host_id, alias, gpu_uuid, port, destination, rdma_device, mac_address):
         gpus = {
             "0": {
                 "uuid": gpu_uuid,
@@ -227,6 +329,9 @@ def inventory_example():
             "nics": {
                 "eth0": {
                     "physical_port": port,
+                    "rdma_device": rdma_device,
+                    "verbs_port": 1,
+                    "mac_address": mac_address,
                     "mtu": 9000,
                     "transport_overhead_bytes": 28,
                     "ethernet_frame_overhead_bytes": 18,
@@ -246,7 +351,7 @@ def inventory_example():
     return {
         "schema_version": 1,
         "hosts": [
-            host("fake-host-a", "node-a", "GPU-FAKE-A", "port-a", "192.0.2.10"),
-            host("fake-host-b", "node-b", "GPU-FAKE-B", "port-b", "192.0.2.11"),
+            host("fake-host-a", "node-a", "GPU-FAKE-A", "port-a", "192.0.2.10", "mlx5_fake_a", "02:00:00:00:00:0a"),
+            host("fake-host-b", "node-b", "GPU-FAKE-B", "port-b", "192.0.2.11", "mlx5_fake_b", "02:00:00:00:00:0b"),
         ],
     }

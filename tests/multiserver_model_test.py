@@ -27,6 +27,67 @@ class GlobalPlanTest(unittest.TestCase):
         plan["observation"]["station_ids"].append(9999)
         self.assertEqual(source["observation"]["station_ids"], [1000, 1001, 1002, 1003])
 
+    def test_telescope_metadata_is_required_and_preserved(self):
+        source = global_example()
+        source["metadata"] = {"telescope": "CA"}
+        before = copy.deepcopy(source)
+        plan = validate_global(source)
+        self.assertEqual(plan["metadata"], {"telescope": "CA"})
+        self.assertEqual(source, before)
+        source["metadata"]["telescope"] = "OTHER"
+        self.assertEqual(validate_global(source)["metadata"]["telescope"], "OTHER")
+
+        missing = global_example()
+        del missing["metadata"]
+        self.assert_invalid(missing, "MISSING_FIELD")
+        empty = global_example()
+        empty["metadata"] = {"telescope": ""}
+        self.assert_invalid(empty, "INVALID_TYPE")
+
+    def test_frequency_examples_keep_exact_odd_and_even_centers(self):
+        source = global_example()
+        # Full-band center is exactly 1.3 GHz for odd F=7.
+        self.assertEqual(
+            source["channels"]["first_center_frequency_hz"]
+            + (source["channels"]["nchan"] - 1) * source["channels"]["channel_spacing_hz"] // 2,
+            1_300_000_000,
+        )
+        validate_global(source)
+        local_a_numerator = (
+            2 * source["channels"]["first_center_frequency_hz"]
+            + (4 - 1) * source["channels"]["channel_spacing_hz"]
+        )
+        self.assertEqual(local_a_numerator % 2, 0)
+        self.assertEqual(local_a_numerator // 2, 1_298_500_000)
+
+        tail = source["assignments"][1]
+        tail_offset = tail["first_channel_id"] - source["channels"]["first_channel_id"]
+        tail_first = (
+            source["channels"]["first_center_frequency_hz"]
+            + tail_offset * source["channels"]["channel_spacing_hz"]
+        )
+        self.assertEqual(tail_first, 1_301_000_000)
+        tail_center_numerator = (
+            2 * tail_first + (tail["nchan"] - 1) * source["channels"]["channel_spacing_hz"]
+        )
+        self.assertEqual(tail_center_numerator % 2, 0)
+        self.assertEqual(tail_center_numerator // 2, 1_302_000_000)
+
+        even = global_example()
+        even["channels"].update({
+            "nchan": 4,
+            "first_center_frequency_hz": 1_298_500_000,
+        })
+        even["assignments"] = [copy.deepcopy(even["assignments"][0])]
+        even["assignments"][0]["nchan"] = 4
+        even["assignments"][0]["deployment_profile"] = "example-node-a-gpu0"
+        self.assertEqual(
+            even["channels"]["first_center_frequency_hz"]
+            + (even["channels"]["nchan"] - 1) * even["channels"]["channel_spacing_hz"] // 2,
+            1_300_000_000,
+        )
+        validate_global(even)
+
     def test_overlapping_assignment_is_rejected(self):
         source = global_example()
         source["assignments"][1]["first_channel_id"] = 103

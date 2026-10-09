@@ -1,5 +1,8 @@
 {
   "schema_version": 1,
+  "metadata": {
+    "telescope": "CA"
+  },
   "observation": {
     "observation_id": "multi-server-layout-example",
     "utc_start": "2026-09-12-00:00:00",
@@ -11,7 +14,7 @@
   "channels": {
     "first_channel_id": 100,
     "nchan": 7,
-    "first_center_frequency_hz": 1200000000,
+    "first_center_frequency_hz": 1297000000,
     "channel_spacing_hz": 1000000
   },
   "wire": {

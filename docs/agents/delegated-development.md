@@ -5,10 +5,10 @@ Status: user-approved working rule, recorded 2026-09-13. Applies to future repos
 ## Roles and authority
 
 - The coordinating task owns scope, task splitting, dependencies, assignment, independent review and acceptance. The coordinator is the user's primary contact and keeps the overall plan current.
-- New bounded implementation work is assigned to separate Codex conversations using `gpt-5.6-luna` (Luna). Use the app's task creation interface, not an ephemeral sub-agent as a substitute for the requested persistent conversation. If Luna is unavailable, report it and request a model decision; do not silently choose another model.
-- The existing `GPU服务器代码测试` task retains synchronization, remote build/test and result-reporting ownership. Luna implementation tasks do not replace that workflow or run remote tests themselves.
+- User update on 2026-10-08: new bounded implementation tasks use separate Codex conversations with model `gpt-6.1-sol` and reasoning `high`. This supersedes the original Luna default. Already-started MS-03/MS-04 retain their recorded model unless the user requests a change. Use the app's task creation interface, not an ephemeral sub-agent as a substitute for a persistent conversation. If the requested model/effort is unavailable, report it and request a model decision; do not silently substitute.
+- The existing `GPU服务器代码测试` task retains synchronization, remote build/test and result-reporting ownership. Implementation tasks do not replace that workflow or run remote tests themselves.
 - The user retains commit, push, merge and material scope-change decisions. Passing review or tests is not permission for these actions.
-- This rule permits future approved work packages to be assigned to new Luna conversations; merely saving the rule does not authorize starting all roadmap tasks or unrelated work.
+- This rule permits future approved work packages to be assigned to new persistent conversations; merely saving the rule does not authorize starting all roadmap tasks or unrelated work.
 
 ## 1. Split and prepare
 
@@ -31,7 +31,7 @@ Record task title/ID, model, branch/worktree, base identity, dependency, file ow
 
 ## 2. Implementation and delivery
 
-The Luna task reads the supplied repository rules/spec/plan, uses the agreed test-driven workflow, implements only its scope and reports blockers instead of inventing paths, changing the contract or bypassing required gates.
+The implementation task reads the supplied repository rules/spec/plan, uses the agreed test-driven workflow, implements only its scope and reports blockers instead of inventing paths, changing the contract or bypassing required gates.
 
 At handoff back, call `send_message_to_thread` with the coordinating task ID. Verify delivery succeeded; on failure resolve the ID and retry once, then explicitly report the notification failure. A final message only inside the child conversation is not a confirmed handoff.
 
@@ -53,11 +53,34 @@ ARCHIVE_STATUS: KEEP_OPEN_PENDING_ACCEPTANCE
 
 Self-tests establish development evidence, not coordinator acceptance or server acceptance. A task must not call itself accepted because its own tests passed.
 
+### Source identity checkpoints
+
+User-approved on 2026-09-30: refresh source manifests and recorded SHA256 values
+at stage-completion freezes and formal test handoffs/acceptance, not after every
+edit, review correction or local development test. Use Git diffs during ongoing
+development; an earlier manifest describes its frozen snapshot, not the dirty
+working tree, and does not block continued local work. Before formal testing,
+freeze the intended inputs, refresh their identity once, and verify synchronized
+sources against it. Unchanged retries reuse that identity; changed test inputs
+require a new test snapshot. Preserve historical test hashes and results rather
+than rewriting them. Routine reports use branch/short commit/status; keep full
+hashes in the evidence and handoff records.
+
 ## 3. Coordinator acceptance
 
 The coordinator waits on the actual task ID/cursor, reviews the delivered diff against scope and reads executable test evidence. Completion notifications and timeouts are not substitutes for review. Check new failure paths, compatibility, resource ownership and whether expected files/identities match the delivered implementation.
 
-Return findings to the same Luna conversation for correction. Re-review corrected behavior and verify relevant tests; do not open duplicate implementation tasks simply because a fix is required.
+Keep the coordinator turn active through an approved handoff and its acceptance
+work. When a child completes, retrieve its delivery and start review without
+requiring another user prompt. If callback delivery fails, use the task's actual
+ID with `wait_threads`/`read_thread`, record the notification failure separately,
+and continue review from the retained diff and evidence. Child freezing prevents
+concurrent edits; it does not pause coordinator acceptance. Pause only for an
+explicit user stop, an evidenced external blocker, or a decision requiring new
+authority. When all children are idle, reconcile each ledger state against its
+latest delivery before reporting the next step.
+
+Return findings to the same implementation conversation for correction. Re-review corrected behavior and verify relevant tests; do not open duplicate implementation tasks simply because a fix is required.
 
 For every completed feature/behavior change, the coordinator ensures the required handoff reaches `GPU服务器代码测试`. The implementation task supplies the affected paths/fixtures; the test task performs the actual source synchronization and remote gates. Confirm that returned evidence tests the handed-off code identity, not a different or older checkout. Apply the existing repository failure, cleanup and notification rules unchanged.
 

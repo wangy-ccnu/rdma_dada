@@ -1,6 +1,6 @@
 # Multi-server Control Implementation Plan — Roadmap and Version Isolation
 
-> **For agentic workers:** The coordinator assigns bounded implementation to new persistent Luna tasks under `docs/agents/delegated-development.md`; each implementation task uses superpowers:executing-plans for its assigned scope. No automatic commit, push or merge. Checklist entries describe future work unless explicitly marked complete.
+> **For agentic workers:** The coordinator assigns bounded implementation to persistent tasks using the current model/effort policy in `docs/agents/delegated-development.md`; each implementation task uses superpowers:executing-plans for its assigned scope. No automatic commit, push or merge. Checklist entries describe future work unless explicitly marked complete.
 
 **Goal:** Implement centralized configuration, start/stop and business monitoring for one processing pipeline per GPU without changing the paper maintenance branch or its evidence.
 

@@ -3,6 +3,20 @@
 Coordinator: `多服务器同步开发` (`01a090fd-55d8-7b83-9ea1-1a53eaa1b952`).
 Rule: `docs/agents/delegated-development.md`.
 
+## Current checkpoint — 2026-10-08
+
+MS-01/02 accepted and archived. MS-03/04/05 accepted for offline configuration:
+independent review, qths fresh build and11 CTest suites each3 repetitions PASS.
+Reviewed source integrated into the feature worktree;20 delivered files match
+the tested snapshot exactly. See `ms03-ms05-acceptance.md` and its machine-readable
+evidence links. No data flow, paper-branch modification, commit/push/merge.
+MS-03/04/05 children KEEP_OPEN for the pending Git/integration checkpoint;
+their historical RUNNING/CHANGES_REQUIRED entries below are superseded.
+
+Model policy updated by user on 2026-10-08: future task assignments use
+`gpt-6.1-sol` / `high`. Historical model records below remain unchanged;
+already-started MS-03/MS-04 are not restarted or silently switched.
+
 ## MS-01 — Global observation schema and validation
 
 | Field | Recorded value |
@@ -326,3 +340,133 @@ frozen manifests and original server command-output evidence. The latter has
 SHA256 `b160b673c93382d189b6e43d7354b3d0e53ba37e695210d0489e49f21ab9d853`.
 Commit authorization does not include push, merge to pipeline-architecture,
 or deletion of the child worktrees.
+
+## MS-03/04/05 — Configuration bundle stage authorized 2026-09-30
+
+The user authorized these three planned tasks. Dependencies are sequential:
+weights slicing -> per-instance bundle generation -> existing compiler
+compatibility. Implementation is assigned only when its required reviewed
+source/interface is available; approval does not authorize automatic commits,
+pushes, algorithm changes or paper-branch changes.
+
+### MS-03 — Weight slicing
+
+- Actual title: `MS-03 权重按频道无损切分`.
+- Task ID: `01a0f2c3-08ab-79b2-897a-091bece9198f`.
+- Creation client ID: `client-new-thread:21ac0ee4-e9bf-4df3-9f04-e3942646b163`.
+- Model: `gpt-5.6-luna`, reasoning high.
+- Worktree: `/Users/ywang/.codex/worktrees/e338/rdma_dada`, detached base
+  `5851eaed6cff78179d9cee763c6d4713c1095b08` from the feature branch.
+- Status: LOCAL_REVIEW_PASS / SERVER_TEST_PENDING (2026-10-08).
+  Initial delivery passed 68 tests but required two correction rounds;
+  final local regression passes 81 tests, including 21 weight tests.
+  Native task creation succeeded; actual ID recovered from
+  local task index and checked via native read_thread. Initial checkout clean.
+- Handoff: `ms03-development-handoff.md`; owns weights.py, its new tests and
+  independent fixture extension only. Current coordinator procedure, including
+  checkpoint-only SHA refresh, is explicitly supplied by absolute path.
+- No source manifest regeneration during implementation; freeze at stage/test
+  boundary. Review/server acceptance/commit/archive remain outstanding.
+
+Review record: `ms03-review.md`. Corrections were delivered successfully to the
+same child task through send_message_to_thread. MS-04/05 remain dependency-gated;
+no remote test, integration, commit, push or archive has occurred for MS-03.
+
+2026-10-08: corrected delivery actively recovered (child callback FAIL), 78 local
+tests independently PASS. Spec re-review retains two failure-path/test-coverage
+findings; a second correction request was successfully delivered. No final
+source freeze or remote acceptance yet. Advisory ponytail review is recorded
+in the review file; no simplification was applied by the coordinator.
+
+Second correction is now frozen in the child worktree and independently reviewed:
+Standards0 blocking/1 advisory, Spec0 remaining; 81 local tests PASS. Final
+snapshot IDs and callback-recovery status are in ms03-review.md. Server gate
+will be grouped with configuration-stage compatibility; no remote PASS claimed.
+
+### MS-04 — Portable per-instance bundles
+
+MS-04a LOCAL_REVIEW_PASS / SERVER_TEST_PENDING; MS-04b RUNNING (2026-10-08).
+Native creation
+accepted client ID `client-new-thread:06d35ef1-4b31-41dc-943b-942b55dd89b3`,
+requested title `MS-04 实例配置包生成`, model gpt-5.6-luna/high, isolated worktree
+from feature commit5851eaed. Native read_thread confirms task ID
+`01a11b57-b539-7d80-86e4-0c72b4892a29` and exact title. Checkout confirmed at
+`/Users/ywang/.codex/worktrees/1209/rdma_dada`, detached HEAD5851eaed.
+Handoff: `ms04-development-handoff.md`.
+
+The user confirmed explicit inventory, CA, full-band center1.3GHz/channel
+spacing1MHz, deterministic test weights and no disk output. The updated plan
+specifies required inventory_path plus explicit NIC device/MAC/verbs-port1 and
+storage inputs. MS-04a changes only feature schemas/validators/examples/tests,
+so it can proceed while MS-03 is corrected. Expanded resource profiles remain;
+no template engine or automatic hardware discovery is introduced.
+
+MS-04b requires reviewed MS-03 slicing and explicit transfer of uncommitted
+dependencies. Existing Observation v1, algorithms, NIC configuration and paper
+branch remain unchanged. MS-05 is not dispatched until bundles pass review.
+
+MS-04a delivery callback PASS (2026-10-08), 11 allowed files changed/added;
+coordinator independently reran model26 + deployment41 =67 tests PASS and
+diff check PASS. Status CHANGES_REQUIRED: an unused inventory NIC with
+verbs_port2 incorrectly rejects a deployment using only port1. Restrict runtime
+port support validation to selected NICs; retain positive integer validation
+for inventory entries. Correction sent to the same child. Independent Standards/
+Spec reviewers use gpt-6.1-sol/high under the updated model policy. No remote
+test, commit, merge or archive.
+
+MS-04a correction local review PASS: coordinator69 tests PASS, unused-NIC scope
+and exact tail frequencies verified, redundant test setup removed. Record:
+`ms04-review.md`. Follow-up delivery `ms04b-development-handoff.md` supplies
+reviewed MS-03 source identities and fixture merge instructions. Explicit
+MS-04b follow-up successfully delivered to the same child; remote test task
+received queued MS-04a requirements, with instruction to wait for the combined
+frozen-source handoff. No remote gate started.
+
+### MS-04b coordinator acceptance — 2026-10-08
+
+Delivery recovered through wait_threads after child callback failure; the native
+task is idle/frozen, not blocked in implementation. Coordinator independently
+ran 115/115 pure tests and diff check PASS. Independent Standards and Spec
+reviews (gpt-6.1-sol/high) report zero findings; ponytail has no actionable cuts.
+See `ms04b-review.md` and `manifests/ms04b-reviewed-files.sha256` for scope and
+the sixteen-file dependency snapshot.
+
+Status: LOCAL_REVIEW_PASS / SERVER_TEST_PENDING. MS-03/MS-04 remain open and
+frozen. MS-05 dispatch is now eligible using `ms05-development-handoff.md`.
+No remote data flow or Git action has been performed.
+
+### MS-05 — Existing compiler compatibility
+
+RUNNING, dispatched 2026-10-08 after MS-04b independent local review PASS.
+
+| Field | Recorded value |
+|---|---|
+| Actual title | MS-05 现有编译器兼容性验收 |
+| Task ID | `01a11b7e-d6d1-7942-b378-5e520e48d2c3` |
+| Creation client ID | `client-new-thread:1a4445af-fb91-4216-a760-b4be58e07464` |
+| Model | `gpt-6.1-sol`, reasoning `high` |
+| Starting branch/base | `codex/multi-server-observation`, `5851eaed` |
+| Worktree | `/Users/ywang/.codex/worktrees/179b/rdma_dada` |
+| Handoff | `ms05-development-handoff.md` |
+| Dependency | MS-04b reviewed sixteen-file snapshot imported explicitly, not inherited dirty files |
+| Git/archive | No commit/push/merge/archive authorized |
+
+Scope: compiler adapter, actual compiler integration tests, CTest registration
+and configuration documentation. Remote toolchain facts are refreshed by the
+testing task for dependent build steps; no RDMA/GPU data flow is required.
+Server test task received MS-04b completion requirements successfully and waits
+for the combined MS-03–05 frozen-source handoff; no remote run requested yet.
+
+MS-05 initial delivery retrieved despite callback refusal. Coordinator targeted
+CTest11/11 PASS, but real-compiler fault injection found uncaught post-publication
+cleanup failure (published output with bare PermissionError). Same child is
+correcting it; status CHANGES_REQUIRED, evidence in `ms05-review.md`.
+Server read-only Phase0 refreshed successfully; precise findings and limits are
+in `ms03-ms05-phase0.md`. No source sync/build/project test occurred remotely.
+
+MS-05 correction: LOCAL_REVIEW_PASS / SERVER_TEST_PENDING. Coordinator verified
+133 pure tests,12 real-compiler cases and11 registered CTests after the cleanup
+fix. Complete reviewed MS-03–05 source remains in179b; frozen312-entry manifest
+SHA `fa0483687947d874146dc276afe69eadf4d2ec241b4cd372ca90a27d09ca7553`.
+See `ms05-review.md` and `ms03-ms05-server-handoff.md`. No Git integration or
+archive yet; callback failures were recovered through wait/read, not ignored.

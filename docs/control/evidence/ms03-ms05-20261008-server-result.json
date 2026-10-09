@@ -1,0 +1,36 @@
+{
+  "task": "MS-03-MS-05 offline server acceptance",
+  "coordinator": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "executor": "019fbb68-ae6f-77f0-bfdd-30bc30bd6c45",
+  "source": "/Users/ywang/.codex/worktrees/179b/rdma_dada",
+  "source_manifest": "config/testing/multiserver-source-manifest.sha256",
+  "manifest_sha256": "fa0483687947d874146dc276afe69eadf4d2ec241b4cd372ca90a27d09ca7553",
+  "manifest_entries": 312,
+  "hosts": {"HF": "qtrelay0", "qths1": "qths1"},
+  "build": {"dir": "/home/user/wy/build-multiserver-config-20261008", "cmake": "3.31.12", "ctest": "3.31.12", "build_type": "Release", "BUILD_TESTING": true, "BUILD_RDMA_PIPELINE": false, "USE_CUDA": false},
+  "manifest_verification": {"HF_sha_exit": 0, "HF_check_exit": 0, "qths_sha_exit": 0, "qths_check_exit": 0},
+  "tests": [
+    {"name":"multiserver_model_test","registered":true,"repetitions":3,"exit_code":0,"result":"PASS"},
+    {"name":"multiserver_deployment_test","registered":true,"repetitions":3,"exit_code":0,"result":"PASS"},
+    {"name":"multiserver_weights_test","registered":true,"repetitions":3,"exit_code":0,"result":"PASS"},
+    {"name":"multiserver_bundle_test","registered":true,"repetitions":3,"exit_code":0,"result":"PASS"},
+    {"name":"multiserver_compiler_unit_test","registered":true,"repetitions":3,"exit_code":0,"result":"PASS"},
+    {"name":"multiserver_compile_test","registered":true,"repetitions":3,"exit_code":0,"result":"PASS"},
+    {"name":"observation_config_test","registered":true,"repetitions":3,"exit_code":0,"result":"PASS"},
+    {"name":"resolved_observation_plan_test","registered":true,"repetitions":3,"exit_code":0,"result":"PASS"},
+    {"name":"observation_artifacts_test","registered":true,"repetitions":3,"exit_code":0,"result":"PASS"},
+    {"name":"beamform_weight_metadata_test","registered":true,"repetitions":3,"exit_code":0,"result":"PASS"},
+    {"name":"observation_config_compile_test","registered":true,"repetitions":3,"exit_code":0,"result":"PASS"}
+  ],
+  "binary_sha256": {
+    "observation_config_compile":"2e4307fa3e9ab9adbdf6bc9b6902623738123539633e5d5fd56c8a68a243a7ac",
+    "observation_config_test":"7344ca36bb55ca5dce704b1c6cdc6f1f1a8395bef81fc1efc5820eaf4f88746d",
+    "resolved_observation_plan_test":"3ff98b4d4318d543627fe98cd3039b4528bd621b9c9d0d765550e1a9720639c3",
+    "observation_artifacts_test":"10c7aaa26631d9802cee2e4b572eaa1063bb00c0f38231c1acc21b856ca8621f",
+    "beamform_weight_metadata_test":"1dde0553d0a2bb842f1e36781c9a5d47e728b2fc9e1ccfb64f11a89def760854"
+  },
+  "residue": {"multiserver_processes":0,"dataflow_processes":0,"test_owned_ipc":0,"unrelated_gdm_ipc":"preserved"},
+  "test_result":"PASS_OFFLINE_ONLY",
+  "cleanup_result":"PASS",
+  "dataflow":"NOT_RUN"
+}

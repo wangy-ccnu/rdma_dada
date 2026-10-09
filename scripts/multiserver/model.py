@@ -192,10 +192,14 @@ def validate_global(document):
     """
     _exact_keys(
         document,
-        ["schema_version", "observation", "channels", "wire", "time_grid", "processing", "assignments", "monitoring"],
+        ["schema_version", "metadata", "observation", "channels", "wire", "time_grid", "processing", "assignments", "monitoring"],
         "root",
     )
     _integer(document["schema_version"], "schema_version", 1, 1)
+
+    metadata = document["metadata"]
+    _exact_keys(metadata, ["telescope"], "metadata")
+    _string(metadata["telescope"], "metadata.telescope")
 
     observation = document["observation"]
     _exact_keys(

@@ -505,6 +505,26 @@ if(BUILD_TESTING)
     set_tests_properties(pipeline_config_rejects_legacy_test
         PROPERTIES WILL_FAIL TRUE)
     if(Python3_Interpreter_FOUND)
+        foreach(multiserver_suite model deployment weights bundle)
+            add_test(
+                NAME multiserver_${multiserver_suite}_test
+                COMMAND ${Python3_EXECUTABLE} -B -m unittest discover
+                        -s ${CMAKE_CURRENT_SOURCE_DIR}/tests
+                        -p multiserver_${multiserver_suite}_test.py -v)
+            set_tests_properties(multiserver_${multiserver_suite}_test
+                PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        endforeach()
+        add_test(
+            NAME multiserver_compiler_unit_test
+            COMMAND ${Python3_EXECUTABLE} -B
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/multiserver_compile_test.py --unit)
+        add_test(
+            NAME multiserver_compile_test
+            COMMAND ${Python3_EXECUTABLE} -B
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/multiserver_compile_test.py
+                    $<TARGET_FILE:observation_config_compile>)
+        set_tests_properties(multiserver_compiler_unit_test multiserver_compile_test
+            PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         add_test(
             NAME observation_config_compile_test
             COMMAND ${Python3_EXECUTABLE}
