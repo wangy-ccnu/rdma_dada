@@ -8,7 +8,7 @@
 
 **Tech Stack:** Existing C++11/CMake processing code; proposed Python 3.8-compatible control modules with standard-library JSON, subprocess and SQLite; plain HTML/JavaScript functional UI. Remote executable paths and transport details require Phase 0 verification; no new remote package installation is assumed.
 
-**Spec:** `docs/superpowers/specs/2026-09-12-multi-server-observation-design.md` in this worktree. Compiler detail: `docs/superpowers/plans/2026-09-12-multi-server-config-implementation.md`.
+**Spec:** [agreed requirements](../specs/2026-09-12-multi-server-observation-design.md). Implemented interfaces: [configuration](../../control/configuration.md) and [lifecycle](../../control/lifecycle.md). Current acceptance and task identities: [ledger](../../control/task-ledger.md).
 
 ## Global Constraints
 
@@ -23,29 +23,16 @@
 - First version prioritizes function, not UI polish or new performance campaigns. Existing correctness, ownership and cleanup requirements still apply.
 - GPU-server acceptance belongs to `GPU服务器代码测试`; local test PASS is not remote acceptance. Commit and push remain user decisions.
 
-## 1. Repository facts and isolation already established
+## 1. Branch baseline
 
-Read-only inspection on 2026-09-12 found:
-
-| Item | Recorded value |
-|---|---|
-| Actual paper branch name | `codex/pipeline-architecture` (not `pipeline-archtecture`) |
-| Local committed paper HEAD / new feature base | `febdc0ee4587d5c8bd3b9f8466bbc954e1204389` |
-| Locally cached origin paper ref | `c96a0a390ef21c0994feb41aabcf5a00ae353d42` |
-| Local-only commits | `cf7e02c`, `5fba3f8`, `febdc0e`; no fetch/push performed in this planning turn |
-| Paper worktree | `/Users/ywang/WorkFile/code/rdma_dada` |
-| Feature branch | `codex/multi-server-observation` |
-| Feature worktree | `/Users/ywang/WorkFile/code/rdma_dada/.worktrees/multi-server-observation` |
-| Existing comparison branch | `codex/gpu-only-pressure`, inspected at `209fd36`; left untouched |
-| Existing receiver ablation | `codex/rdma-staged-copy-ablation`, inspected at `5e7bd7e`; left untouched, including prunable worktree metadata |
-
-- [x] Verify `.worktrees/` is already ignored; no `.gitignore` change needed.
-- [x] Create the feature branch/worktree from the exact committed paper HEAD, not the older remote ref and not the dirty working tree.
-- [x] Run local `python3 -B tests/generate_source_manifest_test.py -q`: 2 tests PASS.
-- [x] Run local `python3 -B tests/task8c_profiles_test.py -q`: 12 tests PASS.
-- [x] Copy only the new multi-server design document into the feature worktree.
-
-The parent has uncommitted numerical-suite, CMake, tests, manifests and documentation changes. They remain in the parent and were NOT imported. This feature base is a pinned Git commit, not a claim that all current paper evidence was generated from that commit. Evidence continues to use its recorded source/build/config identity.
+Feature `codex/multi-server-observation` was created from committed paper
+revision `febdc0ee4587d5c8bd3b9f8466bbc954e1204389`, not its dirty worktree or
+an older remote ref. Feature checkout:
+`/Users/ywang/WorkFile/code/rdma_dada/.worktrees/multi-server-observation`.
+Paper checkout: `/Users/ywang/WorkFile/code/rdma_dada`.
+Existing `codex/gpu-only-pressure` and `codex/rdma-staged-copy-ablation`
+remain independent. See the ledger for subsequent accepted implementation bases;
+initial planning checks do not replace a stage's recorded test identity.
 
 ## 2. Git and evidence policy
 
@@ -66,7 +53,7 @@ Do not stash, reset, clean, move, commit or rewrite the parent's dirty changes. 
 
 | Group | Subject | Content |
 |---|---|---|
-| 0 | `docs(control): define multi-server isolation and implementation plan` | Spec, two plans and `docs/agents/delegated-development.md`; local ignored AGENTS entry is not force-added |
+| 0 | `docs(control): define multi-server isolation and implementation plan` | Agreed design, roadmap and delegation rules; local ignored AGENTS entry is not force-added |
 | 1 | `feat(config): validate global observation and GPU assignments` | New global model/schema/deployment validation and tests |
 | 2 | `feat(config): generate per-GPU observation and weight bundles` | Weight slicing, portable bundle generation, compiler compatibility tests |
 | 3 | `feat(control): model idempotent observation lifecycle` | Pure state machine, persisted operation identity, fake-host tests |
@@ -91,7 +78,7 @@ Do not automatically create tags. When the user wants a release/checkpoint, reco
 
 Using separate worktrees is insufficient if both are mirrored to `/home/user/wy/rdma_dada` or run on the same hardware simultaneously.
 
-Proposed feature namespace (must be confirmed unused/available by Phase 0):
+Feature namespaces (source/results used in offline acceptance; runtime roots still require Phase 0):
 
 | Purpose | Reserved proposal |
 |---|---|
@@ -100,7 +87,7 @@ Proposed feature namespace (must be confirmed unused/available by Phase 0):
 | Feature configurations/owned run state | `/home/user/wy/multiserver-runs/<run_id>/` |
 | Feature functional evidence | `/home/user/wy/task8c-multiserver-results/` |
 
-These are planning proposals, not directories created or checked remotely. Keep ONE source mirror per branch purpose, not archive/r1/r2 source copies. Full source mirroring and per-file SHA verification still apply within the feature namespace; preserve results/data, and scope stale-source removal only to the verified feature source root. Never mirror this feature into the paper canonical source path.
+Source/result roots were verified during offline acceptance; runtime and fresh build roots must be checked before use. Keep ONE source mirror per branch purpose, not archive/r1/r2 source copies. Full source mirroring and per-file SHA verification still apply within the feature namespace; preserve results/data, and scope stale-source removal only to the verified feature source root. Never mirror this feature into the paper canonical source path.
 
 Build/runtime disk namespaces do not isolate NIC, CPU, GPU, RAM or shared-memory keys. Before any feature data flow, the testing task checks for paper runs/owned resources, conflicts and aggregate capacity. Defer the feature run if shared hardware is occupied; do not kill or clean another task. Paper supplementary testing has priority. Source sync and runtime resource ownership have separate ledgers.
 
@@ -117,26 +104,27 @@ Build/runtime disk namespaces do not isolate NIC, CPU, GPU, RAM or shared-memory
 - [ ] Verify feature namespace isolation and record shared hardware scheduling constraints with paper testing.
 - [ ] Return facts to the development task. If a facility is missing, propose the smallest environment decision; do not install it silently or revert to the paper source/build paths.
 
-This planning turn did not run Phase 0 or remote tests. Phase 1 below is local/pure and can be designed now. The remote execution adapter and its test runner receive their own concrete implementation plan only after these facts are available; this is an explicit subsystem gate, not a claim that those paths are ready.
+Offline configuration/control Phase0 and acceptance are recorded in the stage results. They do not establish live-host supervision, disconnect survival, NIC/clock performance or Web access. Refresh those specific prerequisites before designing the remote adapter and its runner; the unchecked items above concern that upcoming boundary.
 
 ## 5. Implementation work packages
 
 ### P1 — Global configuration and portable bundles
 
-Detailed TDD tasks, interfaces and file list are in `2026-09-12-multi-server-config-implementation.md`. Expected deliverable: deterministic bundles accepted by the existing single-instance compiler without altering old observations, headers or algorithm behavior. No SSH in this package.
+Accepted MS-01–05, committed through82ac66f. See
+[configuration interfaces and reproduction](../../control/configuration.md),
+[MS-01/02 acceptance](../../control/ms01-ms02-acceptance.md) and
+[MS-03–05 acceptance](../../control/ms03-ms05-acceptance.md).
+Portable per-GPU bundles resolve through the unchanged single-instance compiler.
+Static validation is not live resource readiness; no remote execution is implemented.
 
 ### P2 — Control protocol and lifecycle, using fake hosts first
 
-**Create:** `scripts/multiserver/protocol.py`, `state.py`, `store.py`, `controller.py`; `config/multiserver-command-v1.schema.json`; `tests/multiserver_controller_test.py`.
-
-**Interfaces:** `ControlRequest = {request_id, run_id, operation, targets, bundle_id, mode}`; operations `prepare/start/status/stop`, stop mode `graceful/force`. `RunStore.apply(request)` records idempotency and returns operation ID/current state. The host transport interface is `send(host_id, request) -> response`; unit tests inject a fake, not SSH.
-
-- [ ] Write a failing table-driven unittest for `NEW -> PREPARING -> READY -> RUNNING -> DRAINING -> COMPLETED`, with `PARTIAL_FAILED`, `INTERRUPTED`, `FAILED`, `UNKNOWN` explicit. Per-instance state and aggregate run state are distinct.
-- [ ] Assert duplicate requests with identical content return the same operation and spawn no second process; reused request IDs with different content fail.
-- [ ] Implement durable SQLite state transactions and the all-ready barrier. Validation/readiness is not equivalent to successful distributed start.
-- [ ] Test partial preparation rollback, failure while start commands are being delivered, runtime-local failure while peers continue, controller restart, late/stale status and a lost response after an operation actually succeeded.
-- [ ] Test that startup rollback with an unreachable host reports unresolved ownership, not a false clean terminal state. Runtime stale status does not issue stop commands.
-- [ ] Server-test the pure controller/store tests before proposing commit group 3. No network data flow needed for this gate.
+Accepted MS-06 offline control on2026-10-11; six Linux suites x3 PASS, no actual
+host/dataflow claim. See [lifecycle API and host contract](../../control/lifecycle.md)
+and [MS-06 acceptance](../../control/ms06-acceptance.md).
+Store/controller/schema and fake-host tests are implemented. Public requests
+target the observation; durable intents and reconciliation guard uncertain actions.
+No production SSH adapter, automatic restart, resume-start API or HA guarantee.
 
 ### P3 — Isolated host supervisor and transport
 
@@ -182,7 +170,7 @@ Detailed TDD tasks, interfaces and file list are in `2026-09-12-multi-server-con
 
 ### P6 — Functional acceptance and documentation
 
-**Create after Phase 0 and P3:** `scripts/multiserver_acceptance.py`, `config/testing/multiserver-functional-suite.json`, `tests/multiserver_acceptance_test.py`; `docs/control/README.md`, `deployment.md`, `results.md`.
+**Create after Phase 0 and P3:** `scripts/multiserver_acceptance.py`, `config/testing/multiserver-functional-suite.json`, `tests/multiserver_acceptance_test.py`. Extend existing configuration/lifecycle guides and add one final acceptance record linked by the ledger; do not duplicate them with parallel usage/status documents.
 
 - [ ] Runner owns exact resources and records full configuration/identity, every repetition, first failure, cleanup and notifications. Do not modify the paper runner merely to add a production-control feature.
 - [ ] Exercise same-host two-instance resource isolation with fake inventory locally; actual multi-GPU server run only when CPU/GPU/NIC resources permit. No fake multi-host performance claim if only one receiving host is available.
@@ -202,7 +190,3 @@ Detailed TDD tasks, interfaces and file list are in `2026-09-12-multi-server-con
 | Functional server suite | Three clean repeated runs with exact fixture/source/build identities | New saturation limit or paper performance acceptance |
 
 Unknown environment facts stop only the dependent remote stage; pure config/state work can proceed. No unsupported fallback into paper paths. No unrelated paper code changes to unblock feature tests. New shared-code defects are explained and isolated rather than silently repaired on both branches.
-
-## 7. Planning-turn outcome
-
-Only independent worktree setup, selected local baseline tests and documentation occurred. No remote calls, source sync, installs, new binaries, rings, data flow, commit, push, tag or merge. The parent paper branch HEAD/index/dirty contents remain unchanged. The new source manifest is deliberately not regenerated until a feature source/test handoff is actually prepared.

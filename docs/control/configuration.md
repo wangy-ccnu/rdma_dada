@@ -1,5 +1,45 @@
 # Multi-server configuration inputs
 
+This is the current configuration/API and reproduction guide. Accepted test
+snapshots are linked from the [task ledger](task-ledger.md); future work belongs
+to the [roadmap](../superpowers/plans/2026-09-12-multi-server-control-roadmap.md).
+Examples are static fixtures, not live host assignments.
+
+## Inputs and derived values
+
+| Input | User supplies | Derived or checked |
+|---|---|---|
+| Global Observation | Telescope, UTC start/duration, ordered Stations, polarization count, sample interval, channels, S/T/K, product/scales, full weights and monitoring policy | Common time grid; contiguous complete channel coverage; no duplicate GPU assignment; local F differs by at most one |
+| Deployment profiles | Per-GPU CPU/NUMA, flow, rings/counts, CUDA mode/slots, receiver and consumer/storage settings | Same-physical-host CPU/SMT, GPU UUID, flow/port, ring and path conflicts; declared capacity and MTU checks |
+| Explicit inventory | Host aliases, CPU topology, GPU identity/capacity, NIC/device/port/MAC/MTU, available resources | Static claims only; no live discovery or automatic placement |
+
+One pipeline per `server_id + gpu_id`. All instances retain ordered Stations,
+common samples/packet S, samples/block T, sample interval d and integration K.
+Require T divisible by S and K; duration must describe whole packet groups.
+Local channel count changes packet/block byte geometry, not sample time.
+WR depth is bounded by raw records/block = (T/S) * A, not local F.
+The existing compiler supplies final geometry, config/geometry IDs and memory
+budgets; reservations alone do not prove the pipeline fits or is runtime-ready.
+
+Implementation entry points (Python 3.8-compatible standard library):
+
+- `model.validate_global(document)`: strict global validation.
+- `deployment.validate_deployment(global_plan, profiles, inventory)`: resource claims.
+- `weights.slice_weights(source, destination, first_f, nchan)`: bounded,
+  byte-preserving F-axis slicing; source/local hashes and shapes.
+- `bundle.build_bundle(global_path, deployment_path, output, *, inventory_path)`.
+- `compiler.resolve_instance(instance_directory, compiler, output)`.
+
+These live under `scripts/multiserver/`; CLI is `scripts/multiserver_compile.py`.
+Schemas/examples live under `config/` and `config/deployments/`.
+Tests use `tests/multiserver_fixture.py`: `write_example_inputs(root)`
+materializes global/deployment/inventory JSON, deterministic weights and wire
+resources. The checked-in example references resources and is not self-contained.
+Fixtures are A4/F7/P1/B2, S512/T16384/K128, 1 MHz sampling, duration1.048576s,
+split F4/F3; test weights are reproducible inputs, not beam calibration.
+
+## Frequency and hardware metadata
+
 The global input identifies the telescope explicitly with `metadata.telescope`.
 It retains one editable frequency input pair: `channels.first_center_frequency_hz`
 and `channels.channel_spacing_hz`. The full-band center is derived exactly in
@@ -38,7 +78,7 @@ python3 -B scripts/multiserver_compile.py --version
 The CLI reports the bundle as JSON on success, or
 `{"ok":false,"error":{"code":"...","message":"..."}}` with nonzero exit
 status on failure, including argument errors. Its version is
-`multiserver-bundle-v1`. Compiler resolution is a subsequent milestone.
+`multiserver-bundle-v1`. Compiler resolution is the separate `resolve` step below.
 
 Weights and wire resources must exist relative to the global JSON directory.
 Supported weights retain MS-03's C-contiguous NPY v1/v2 `|i1` or `<i2`
@@ -202,4 +242,5 @@ compiler/artifact/weight tests, and direct compiler integration; record source,
 binary and generated artifact identities. Generate a full feature manifest only
 at the coordinator review/formal-handoff freeze with explicit output
 `config/testing/multiserver-source-manifest.sha256`; preserve historical/paper
-manifests. No RDMA/GPU flow or remote execution is required or performed here.
+manifests. These commands exercise offline configuration only; they do not launch an RDMA/GPU
+flow or implement remote control.

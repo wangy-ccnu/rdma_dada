@@ -12,6 +12,23 @@ Status: user-approved working rule, recorded 2026-09-13. Applies to future repos
 
 ## 1. Split and prepare
 
+### Markdown necessity rule
+
+User-confirmed 2026-10-11: before creating or retaining a Markdown document, ask:
+
+1. Does the user need to read it?
+2. Does subsequent development or testing need to use it?
+
+At least one answer must have a concrete purpose and reader; otherwise do not
+create a permanent document. Prefer updating the existing authoritative document
+and linking to it over duplicating content or creating another status/report file.
+Active handoff/review notes may serve ongoing work. At stage closure, consolidate
+their unique contracts, unresolved items, reproduction commands and evidence links
+into maintained guides or acceptance records; remove redundant process documents
+within the authorized cleanup scope. Check references before deletion and preserve
+original test evidence and frozen identities. Merely having generated a document
+is not a reason to keep it or move it into a growing archive directory.
+
 Assign one bounded deliverable with independently checkable acceptance criteria, not an entire subsystem with vague completion. Dispatch only tasks whose dependencies are available. Avoid concurrent changes to the same files; shared model/schema/CMake edits are serialized or owned by one named task.
 
 Every handoff must include:

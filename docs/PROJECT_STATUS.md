@@ -1,7 +1,29 @@
 # 项目模块状态
 
-更新日期：2026-08-29
-当前开发分支：`codex/pipeline-architecture`；本轮完成多 Station sender、生产几何
+更新日期：2026-10-11（多服务器功能分支）
+当前分支：`codex/multi-server-observation`。MS-01–05 配置链已验收；MS-06
+SQLite 持久化、观测级启停决策、局部故障隔离与重启协调已完成**离线控制验收**。
+独立审查发现的两项状态错误已修复；qths1 六组 Python 测试各3次，共585个
+用例执行全部通过。未运行真实多机启停、数据流或 Web 界面，也未改算法。
+MS-06 功能与验收证据已提交为 `d1580f6`；功能分支保持独立，未合并到论文分支。
+
+常用入口：
+
+- 用户配置与本地生成/解析：[configuration](control/configuration.md)。
+- 开发接口与启停/恢复语义：[lifecycle](control/lifecycle.md)。
+- 已完成阶段、任务身份与全部验收入口：[开发台账](control/task-ledger.md)。
+- 后续工作与分支隔离：[路线图](superpowers/plans/2026-09-12-multi-server-control-roadmap.md)。
+
+文档只保留用户阅读或后续开发/测试需要的信息。已完成交接和逐轮审查的
+有效内容归入上述接口/验收文档；原始测试 JSON 与冻结身份不随文档整理改写。
+
+下一阶段为隔离的主机进程监管与传输适配，随后接业务监测和 Web/CLI。
+论文分支 `codex/pipeline-architecture` 与既有性能工件保持不变。
+
+## 单实例历史基线
+
+以下保留原有单实例实现/性能记录，不表示本轮重新测试。
+原开发分支：`codex/pipeline-architecture`；当时完成多 Station sender、生产几何
 Power fixture、多 CUDA stream、compute-ring CUDA 注册和 EOD 驱动的 worker transfer
 生命周期，并已通过目标服务器正式验收。
 
