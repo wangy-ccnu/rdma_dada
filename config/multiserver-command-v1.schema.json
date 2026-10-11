@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "multiserver-command-v1.schema.json",
+  "title": "Observation-wide control request v1",
+  "description": "One run, no caller-specified targets or executable commands. Request IDs are scoped to the run.",
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\ud800-\udfff]+$"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "operation"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "request_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "run_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "prepare",
+            "start"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "request_id",
+        "run_id",
+        "operation",
+        "mode"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "request_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "run_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "operation": {
+          "type": "string",
+          "const": "stop"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "graceful",
+            "force"
+          ]
+        }
+      }
+    }
+  ]
+}

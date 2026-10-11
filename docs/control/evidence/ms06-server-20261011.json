@@ -1,0 +1,69 @@
+{
+  "task": "MS-06",
+  "coordinator_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "source_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "purpose": "Linux offline SQLite persistence and fake-host lifecycle acceptance",
+  "source": {
+    "worktree": "/Users/ywang/WorkFile/code/rdma_dada/.worktrees/multi-server-observation",
+    "branch": "codex/multi-server-observation",
+    "manifest_path": "config/testing/multiserver-source-manifest.sha256",
+    "manifest_sha256": "f306f26a428440894d3d824d64e7b923fda37cb0a69825c105fd34c8479b4cdd",
+    "manifest_entries": 339,
+    "HF_check_rc": 0,
+    "qths_check_rc": 0
+  },
+  "mirror": {
+    "HF_path": "/home/user/wy/rdma_dada-multiserver",
+    "qths_path": "/home/user/wy/rdma_dada-multiserver",
+    "result_namespace": "/home/user/wy/task8c-multiserver-results/ms06-offline-20261011",
+    "excluded": [".git", ".staging", ".worktrees", ".agents", ".superpowers", ".claude", ".github", "paper", "test-results", "build*", "data", "data_out", "scripts/data_out"]
+  },
+  "build": {
+    "path": "/home/user/wy/build-ms06-offline-20261011",
+    "cmake": "/home/user/wy/tools/cmake-3.31.12/bin/cmake",
+    "ctest": "/home/user/wy/tools/cmake-3.31.12/bin/ctest",
+    "cmake_version": "3.31.12",
+    "ctest_version": "3.31.12",
+    "options": {"CMAKE_BUILD_TYPE": "Release", "BUILD_TESTING": true, "BUILD_RDMA_PIPELINE": false, "USE_CUDA": false, "BUILD_SSD_BENCHMARK": false, "Python3_EXECUTABLE": "/usr/bin/python3"},
+    "configure_rc": 0,
+    "CMakeCache_sha256": "71d65ebdb4971d69d306c68b119dd15467fa87254b4984a3636398e828512a1e",
+    "compiled_binaries": "none required"
+  },
+  "registrations": {
+    "selection_regex": "^multiserver_(store|controller|model|deployment|weights|bundle)_test$",
+    "registered": ["multiserver_model_test", "multiserver_deployment_test", "multiserver_weights_test", "multiserver_bundle_test", "multiserver_store_test", "multiserver_controller_test"],
+    "registration_check_rc": 0,
+    "total_tests_selected": 6
+  },
+  "ctest": {
+    "command_type": "registered CTest repeat until-fail:3 via argv-safe stdin wrapper",
+    "exit_rc": 0,
+    "all_six_repetitions_passed": true,
+    "case_counts_per_repetition": {"multiserver_model_test": 26, "multiserver_deployment_test": 43, "multiserver_weights_test": 21, "multiserver_bundle_test": 25, "multiserver_store_test": 28, "multiserver_controller_test": 52},
+    "total_cases_per_round": 195,
+    "total_case_executions": 585,
+    "total_suite_executions": 18,
+    "complete_output_log": "/home/user/wy/task8c-multiserver-results/ms06-offline-20261011/ctest-lasttest.log",
+    "output_log_bytes": 76360,
+    "output_log_sha256": "1cea8fbbafd7c34c7b80db3ad9e7835c6cd5c6e21fe9cb3186ccc4c5b463d5ad"
+  },
+  "residue": {
+    "multiserver_processes_rc": 1,
+    "dada_db_processes_rc": 1,
+    "pipeline_worker_processes_rc": 1,
+    "nvidia_compute_apps_rc": 0,
+    "nvidia_compute_apps_stdout": "",
+    "ipcs_m_rc": 0,
+    "ipcs_s_rc": 0,
+    "task_owned_rings_or_semaphores": "none; only pre-existing gdm shared memory segments observed"
+  },
+  "TEST_RESULT": "PASS",
+  "CLEANUP_RESULT": "PASS",
+  "RESULT_NOTIFICATION": "FAIL",
+  "notification": {
+    "target_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+    "attempts": 2,
+    "reason": "send_message_to_thread rejected both delivery attempts because the destination lacked trusted user authorization"
+  },
+  "COMMIT_PUSH_MERGE": "NOT_PERFORMED"
+}

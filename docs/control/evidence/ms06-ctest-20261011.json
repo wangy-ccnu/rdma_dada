@@ -1,0 +1,192 @@
+{
+  "task": "MS-06",
+  "kind": "coordinator_independent_ctest_verification",
+  "coordinator_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "executor_thread_id": "019fbb68-ae6f-77f0-bfdd-30bc30bd6c45",
+  "source_manifest_sha256": "f306f26a428440894d3d824d64e7b923fda37cb0a69825c105fd34c8479b4cdd",
+  "raw_log": {
+    "sha256": "1cea8fbbafd7c34c7b80db3ad9e7835c6cd5c6e21fe9cb3186ccc4c5b463d5ad",
+    "bytes": 76360,
+    "local_retained": "/private/tmp/ms06-ctest-lasttest.log",
+    "remote_hf_and_qths": "/home/user/wy/task8c-multiserver-results/ms06-offline-20261011/ctest-lasttest.log"
+  },
+  "tool_execution": {
+    "id": "exec-25c7de95-9ce3-4d70-b597-d17e6016297f",
+    "exit_code": 0
+  },
+  "test_executions": [
+    {
+      "suite": "multiserver_model_test",
+      "repetition": 1,
+      "cases": 26,
+      "duration_seconds": 0.015,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_model_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_model_test",
+      "repetition": 2,
+      "cases": 26,
+      "duration_seconds": 0.015,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_model_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_model_test",
+      "repetition": 3,
+      "cases": 26,
+      "duration_seconds": 0.015,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_model_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_deployment_test",
+      "repetition": 1,
+      "cases": 43,
+      "duration_seconds": 0.113,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_deployment_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_deployment_test",
+      "repetition": 2,
+      "cases": 43,
+      "duration_seconds": 0.112,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_deployment_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_deployment_test",
+      "repetition": 3,
+      "cases": 43,
+      "duration_seconds": 0.112,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_deployment_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_weights_test",
+      "repetition": 1,
+      "cases": 21,
+      "duration_seconds": 0.208,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_weights_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_weights_test",
+      "repetition": 2,
+      "cases": 21,
+      "duration_seconds": 0.193,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_weights_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_weights_test",
+      "repetition": 3,
+      "cases": 21,
+      "duration_seconds": 0.19,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_weights_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_bundle_test",
+      "repetition": 1,
+      "cases": 25,
+      "duration_seconds": 1.38,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_bundle_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_bundle_test",
+      "repetition": 2,
+      "cases": 25,
+      "duration_seconds": 1.411,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_bundle_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_bundle_test",
+      "repetition": 3,
+      "cases": 25,
+      "duration_seconds": 1.415,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_bundle_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_store_test",
+      "repetition": 1,
+      "cases": 28,
+      "duration_seconds": 5.874,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_store_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_store_test",
+      "repetition": 2,
+      "cases": 28,
+      "duration_seconds": 5.865,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_store_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_store_test",
+      "repetition": 3,
+      "cases": 28,
+      "duration_seconds": 5.87,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_store_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_controller_test",
+      "repetition": 1,
+      "cases": 52,
+      "duration_seconds": 15.256,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_controller_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_controller_test",
+      "repetition": 2,
+      "cases": 52,
+      "duration_seconds": 15.255,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_controller_test.py\" \"-v\""
+    },
+    {
+      "suite": "multiserver_controller_test",
+      "repetition": 3,
+      "cases": 52,
+      "duration_seconds": 15.147,
+      "result": "PASS",
+      "command": "\"/usr/bin/python3\" \"-B\" \"-m\" \"unittest\" \"discover\" \"-s\" \"/home/user/wy/rdma_dada-multiserver/tests\" \"-p\" \"multiserver_controller_test.py\" \"-v\""
+    }
+  ],
+  "total_case_executions": 585,
+  "skipped": 0,
+  "result": "PASS",
+  "scope": "offline Python SQLite/fake-host only; no actual distributed launch/dataflow",
+  "ctest_argv": [
+    "/home/user/wy/tools/cmake-3.31.12/bin/ctest",
+    "--test-dir",
+    "/home/user/wy/build-ms06-offline-20261011",
+    "--repeat",
+    "until-fail:3",
+    "--no-tests=error",
+    "-V",
+    "--output-on-failure",
+    "-R",
+    "^multiserver_(store|controller|model|deployment|weights|bundle)_test$"
+  ],
+  "log_time_range": {
+    "start": "Oct 11 11:37 CST",
+    "end": "Oct 11 11:38 CST",
+    "year": 2026,
+    "precision": "minute as retained in CTest log"
+  },
+  "environment_evidence": "ms06-phase0-20261011.json",
+  "environment": {
+    "python": "3.8.10",
+    "sqlite": "3.31.1",
+    "cmake": "3.31.12",
+    "ctest": "3.31.12"
+  }
+}

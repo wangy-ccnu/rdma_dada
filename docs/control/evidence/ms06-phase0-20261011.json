@@ -1,0 +1,65 @@
+{
+  "task": "MS-06",
+  "coordinator_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "purpose": "Read-only Phase0 for offline Python/SQLite test prerequisites; no sync/build/tests/dataflow",
+  "timestamp_client": "2026-10-11 Asia/Shanghai",
+  "topology": "HF(qtrelay0) -> qths1",
+  "scope": {"qtp_checked": false, "network_or_gpu_dataflow": false, "remote_files_written": false},
+  "hosts": {
+    "HF": {
+      "hostname": {"command": "ssh HF -- /bin/hostname", "rc": 0, "stdout": "qtrelay0"},
+      "python": {"command": "ssh HF -- /usr/bin/python3 --version", "rc": 0, "stdout": "Python 3.8.10"},
+      "source_dir": {"path": "/home/user/wy/rdma_dada-multiserver", "owner": "user:user", "mode": "755", "owner_argv": ["ssh", "HF", "stat", "-c", "%U:%G", "/home/user/wy/rdma_dada-multiserver"], "mode_argv": ["ssh", "HF", "stat", "-c", "%a", "/home/user/wy/rdma_dada-multiserver"], "owner_rc": 0, "mode_rc": 0},
+      "results_dir": {"path": "/home/user/wy/task8c-multiserver-results", "owner": "user:user", "mode": "775", "owner_argv": ["ssh", "HF", "stat", "-c", "%U:%G", "/home/user/wy/task8c-multiserver-results"], "mode_argv": ["ssh", "HF", "stat", "-c", "%a", "/home/user/wy/task8c-multiserver-results"], "du_argv": ["ssh", "HF", "du", "-sh", "/home/user/wy/task8c-multiserver-results"], "owner_rc": 0, "mode_rc": 0, "du_rc": 0, "du": "136K"},
+      "space": {"command": "df -h /home/user/wy", "rc": 0, "stdout": "/dev/nvme0n1p2 468G 35G 410G 8% /"},
+      "sqlite": {
+        "probe_argv": ["ssh", "HF", "/usr/bin/python3", "-B", "-"],
+        "probe_source": "import sqlite3,sys,_sqlite3\nprint(sqlite3.sqlite_version)\nprint(_sqlite3.__file__)\ntry:\n sqlite3.connect('file:ms06-rw-probe?mode=rw', uri=True)\n print('mode_rw_unexpected_success')\nexcept Exception as e:\n print(type(e).__name__ + ':' + str(e))\ncon=sqlite3.connect('file:ms06probe?mode=memory&cache=shared', uri=True)\ncon.execute('create table t(x)')\ncon.execute('begin')\ncon.execute('insert into t values (1)')\nprint(con.execute('select x from t').fetchone()[0])\ncon.rollback()\ncon.close()\n",
+        "raw_stdout": "3.31.1\n/usr/lib/python3.8/lib-dynload/_sqlite3.cpython-38-x86_64-linux-gnu.so\nOperationalError:unable to open database file\n1\n",
+        "rc": 0,
+        "sqlite_version": "3.31.1",
+        "extension": "/usr/lib/python3.8/lib-dynload/_sqlite3.cpython-38-x86_64-linux-gnu.so",
+        "mode_rw_probe": "OperationalError:unable to open database file (expected, no file/resource written)",
+        "memory_uri_transaction": "PASS; create/BEGIN/insert/select/rollback on file:ms06probe?mode=memory&cache=shared; selected value=1",
+        "ldd_argv": ["ssh", "HF", "ldd", "/usr/lib/python3.8/lib-dynload/_sqlite3.cpython-38-x86_64-linux-gnu.so"],
+        "ldd_rc": 0,
+        "ldd": "libsqlite3.so.0=>/lib/x86_64-linux-gnu/libsqlite3.so.0; libc.so.6; libm.so.6; libpthread.so.0; libdl.so.2; ld-linux-x86-64.so.2"
+      }
+    },
+    "qths1": {
+      "hostname": {"command": "ssh HF -- ssh qths1 -- /bin/hostname", "rc": 0, "stdout": "qths1"},
+      "python": {"command": "ssh HF -- ssh qths1 -- /usr/bin/python3 --version", "rc": 0, "stdout": "Python 3.8.10"},
+      "cmake": {"path": "/home/user/wy/tools/cmake-3.31.12/bin/cmake", "version": "3.31.12", "rc": 0},
+      "ctest": {"path": "/home/user/wy/tools/cmake-3.31.12/bin/ctest", "version": "3.31.12", "rc": 0},
+      "source_dir": {"path": "/home/user/wy/rdma_dada-multiserver", "owner": "user:user", "mode": "755", "owner_argv": ["ssh", "HF", "ssh", "qths1", "stat", "-c", "%U:%G", "/home/user/wy/rdma_dada-multiserver"], "mode_argv": ["ssh", "HF", "ssh", "qths1", "stat", "-c", "%a", "/home/user/wy/rdma_dada-multiserver"], "owner_rc": 0, "mode_rc": 0},
+      "results_dir": {"path": "/home/user/wy/task8c-multiserver-results", "owner": "user:user", "mode": "775", "owner_argv": ["ssh", "HF", "ssh", "qths1", "stat", "-c", "%U:%G", "/home/user/wy/task8c-multiserver-results"], "mode_argv": ["ssh", "HF", "ssh", "qths1", "stat", "-c", "%a", "/home/user/wy/task8c-multiserver-results"], "du_argv": ["ssh", "HF", "ssh", "qths1", "du", "-sh", "/home/user/wy/task8c-multiserver-results"], "owner_rc": 0, "mode_rc": 0, "du_rc": 0, "du": "80K"},
+      "space": {"command": "df -h /home/user/wy", "rc": 0, "stdout": "/dev/nvme0n1p2 916G 129G 741G 15% /"},
+      "sqlite": {
+        "probe_argv": ["ssh", "HF", "ssh", "qths1", "/usr/bin/python3", "-B", "-"],
+        "probe_source": "import sqlite3,sys,_sqlite3\nprint(sqlite3.sqlite_version)\nprint(_sqlite3.__file__)\ntry:\n sqlite3.connect('file:ms06-rw-probe?mode=rw', uri=True)\n print('mode_rw_unexpected_success')\nexcept Exception as e:\n print(type(e).__name__ + ':' + str(e))\ncon=sqlite3.connect('file:ms06probe?mode=memory&cache=shared', uri=True)\ncon.execute('create table t(x)')\ncon.execute('begin')\ncon.execute('insert into t values (1)')\nprint(con.execute('select x from t').fetchone()[0])\ncon.rollback()\ncon.close()\n",
+        "raw_stdout": "3.31.1\n/usr/lib/python3.8/lib-dynload/_sqlite3.cpython-38-x86_64-linux-gnu.so\nOperationalError:unable to open database file\n1\n",
+        "rc": 0,
+        "sqlite_version": "3.31.1",
+        "extension": "/usr/lib/python3.8/lib-dynload/_sqlite3.cpython-38-x86_64-linux-gnu.so",
+        "mode_rw_probe": "OperationalError:unable to open database file (expected, no file/resource written)",
+        "memory_uri_transaction": "PASS; create/BEGIN/insert/select/rollback on file:ms06probe?mode=memory&cache=shared; selected value=1",
+        "ldd_argv": ["ssh", "HF", "ssh", "qths1", "ldd", "/usr/lib/python3.8/lib-dynload/_sqlite3.cpython-38-x86_64-linux-gnu.so"],
+        "ldd_rc": 0,
+        "ldd": "libsqlite3.so.0=>/lib/x86_64-linux-gnu/libsqlite3.so.0; libc.so.6; libm.so.6; libpthread.so.0; libdl.so.2; ld-linux-x86-64.so.2"
+      }
+    }
+  },
+  "known_unrechecked_facts": "GPU/RDMA/NIC/NUMA facts are intentionally not rechecked here; refer to docs/control/ms03-ms05-phase0.md as instructed.",
+  "diagnostic_command_errors": [
+    {"command": "stat -c '%U:%G %a %n' ...", "rc": 1, "reason": "nested SSH stripped spaced format into extra argv; corrected with separate no-space stat probes"},
+    {"command": "python3 -c import sqlite3; print(...) via nested SSH", "rc": 1, "reason": "remote shell interpreted semicolon/parentheses; corrected with argv-based stdin probe"}
+  ],
+  "phase0_result": "PASS",
+  "cleanup_result": "NOT_APPLICABLE",
+  "notification": {
+    "status": "FAIL",
+    "target_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+    "attempts": 2,
+    "reason": "send_message_to_thread rejected both attempts because the trusted user request did not explicitly authorize messaging this destination thread"
+  }
+}

@@ -1,0 +1,291 @@
+# Observation control lifecycle (MS-06)
+
+This interface exercises observation-wide control with an injected host adapter
+and clocks. It implements durable requests, action uncertainty, local failure
+isolation and explicit cleanup records. It does not launch a pipeline, access a
+host, operate rings, or collect live rates. Local tests and Linux offline tests
+are development evidence for this contract, not real-host acceptance.
+
+## Public interface
+
+```python
+ObservationController(db_path, host_adapter, *, utc_now, monotonic_ns,
+                      heartbeat_timeout_ns, drain_timeout_ns)
+controller.register_run(run_id, bundle, global_document)
+controller.execute(request)
+controller.status(run_id)
+controller.reconcile(run_id)
+controller.close()
+```
+
+`utc_now()` returns a timezone-aware `datetime.datetime` with UTC offset zero.
+`monotonic_ns()` returns a nonnegative built-in integer and cannot move backwards
+within one controller process. Both timeout arguments are explicit positive
+integers, excluding booleans. No wall-clock sleeps or implicit timeout defaults
+are used. UTC admits the configured start; it never supplies data progress or
+normal-completion evidence. Start at the exact configured UTC is permitted;
+start after it is refused.
+
+One serialized controller owns dispatch, on SQLite's owning thread. A stop may
+be received at an adapter/clock dispatch boundary through the same public API;
+the next dispatch reloads durable intent. This is not an API for concurrent
+command workers, multi-controller HA or distributed exactly-once execution.
+
+`register_run` accepts the MS-04 bundle object and its canonical global document.
+It reuses `validate_global`, checks the bundle's SHA256 identity excluding
+`bundle_id`, and checks `inputs['global-observation.json']` against the validated
+document's sorted, ASCII-escaped, compact JSON plus trailing newline. It binds
+the observation ID, time grid, monitoring policy, participant assignments and
+local observation hashes. Duplicate instance keys, mismatched assignments,
+changed bindings and boolean GPU IDs are rejected. Identical registration is
+idempotent and returns current status. Initial registration always returns NEW;
+a bundle's static status never supplies runtime READY.
+
+Registration does not read bundle paths or execute the compiler. Actual artifact
+byte verification and installed-host readiness belong to the later host adapter.
+This controller relies on matching, fresh host reports for runtime readiness.
+
+`execute` accepts the shape in `config/multiserver-command-v1.schema.json`:
+
+```json
+{"schema_version":1,"request_id":"prepare-1","run_id":"run-a","operation":"prepare"}
+```
+
+`operation` is `prepare`, `start`, or `stop`. Stop alone requires `mode` equal
+to `graceful` or `force`. Extra fields, caller-provided targets/commands, empty
+identifiers, boolean schema versions, and surrogate-containing identifiers are
+rejected. Request IDs are scoped to their run. An identical retry returns the
+same operation ID and current outcome with no further dispatch. Reusing that
+ID with different content fails. A different request ID cannot replay an
+already-requested prepare/start; resolve uncertainty or explicitly stop instead.
+
+The result contains `operation_id`, `request_id`, `outcome` and current `status`.
+Outcome is APPLIED, UNKNOWN, REJECTED or CANCELLED. APPLIED acknowledges the
+command's recorded effect; it is not normal-completion proof. A stop on an
+already confirmed finished run is a recorded no-op and preserves its historical
+result. A stop on an unprepared run needs no host call but suppresses later
+prepare/start and records interruption.
+
+`status` reads the stored snapshot and recomputes freshness locally. It never
+sends a command, writes the database, refreshes report age or advances a deadline.
+`reconcile` queries every registered participant, validates identity and action
+outcomes, and may advance already-authorized human stop, startup rollback or
+failed-instance cleanup. It never resubmits prepare/start. `close` closes SQLite
+only, and can be repeated; healthy pipelines are not tied to its lifetime.
+
+Input/protocol/state errors raise `ControllerError`, a `ValueError` with a stable
+`code` and contextual detail. Missing runs, closed stores, revision conflicts and
+SQLite failures retain the reviewed RunStore typed exceptions. Transport
+`TimeoutError`/`ConnectionError`/`OSError` leaves action outcome UNKNOWN. Other
+adapter exceptions propagate with durable uncertainty still recorded, so the
+caller must reconcile rather than retry a launch.
+
+## Store API
+
+`scripts/multiserver/store.py` exposes:
+
+```python
+store = RunStore(path)
+store.create(run_id, snapshot)
+store.load(run_id)
+store.save(run_id, expected_revision, snapshot)
+store.close()
+```
+
+Create/load/save return `{run_id, revision, snapshot}` with independent snapshot
+data; create begins at revision1 and each successful save increments it.
+Snapshots must be finite JSON objects with Unicode scalar strings, no duplicate
+keys on decode, cycles, coerced keys or unsupported types. Expected revision is
+a positive integer, not bool. Atomic transactions preserve prior state on failure.
+Existing empty, corrupt or unknown-version databases are refused, not reset.
+
+Typed errors distinguish validation, duplicate/missing run, revision conflict,
+closed store, database failure, unsupported version and corruption
+(`StoreValidationError`, `RunExistsError`, `RunNotFoundError`,
+`RevisionConflictError`, `StoreClosedError`, `StoreDatabaseError`,
+`UnsupportedStoreVersionError`, `StoreCorruptionError`). Revisions prevent
+stale writes; they do not establish distributed locking or multi-controller HA.
+
+## Durable actions and host contract
+
+The injected adapter implements:
+
+```python
+host_adapter.send(instance_key: Tuple[str, int], command: dict) -> dict
+```
+
+The key is `(server_id, gpu_id)`. Commands contain `run_id`, `bundle_id`,
+`server_id`, `gpu_id`, `observation_sha256`, `expected_generation`, `action_id`
+and `operation`. Start carries the original `utc_start` and `duration_seconds`;
+it arms that schedule, not a replacement start time. Stop adds `mode`.
+Status/stop also carry `pending_action_ids` for the same participant so the host
+can report authoritative outcomes of uncertain actions, including an in-flight
+prepare stopped before its response arrived. Status queries have fresh query
+IDs and no process side effects. All prepare/start/stop action IDs are durable.
+
+Before a mutating adapter call, the controller saves its request, action intent,
+UNKNOWN dispatch outcome and possible resource ownership. It reloads stop
+intent, fresh readiness and UTC after persistence, before start dispatch.
+It saves the returned outcome against a newly loaded record, preserving a stop
+that arrived during the call. A process failure on either side of the adapter
+call leaves explicit uncertainty rather than pretending no action happened.
+
+The host must deduplicate mutating action IDs and bind cleanup to this run,
+bundle, observation hash and expected generation. When generation is initially
+unknown, it must verify the recorded run/action ownership; it must not stop an
+unrelated process or resource. These are requirements on the future real-host
+adapter, not properties proved by the fake.
+
+Every response has exactly these fields:
+
+| Field | Meaning |
+| --- | --- |
+| `run_id`, `bundle_id`, `server_id`, `gpu_id`, `observation_sha256`, `action_id` | Must match the queried command binding; GPU ID is an integer, not bool |
+| `outcome` | APPLIED, REJECTED, UNKNOWN or authoritative NOT_APPLIED |
+| `state` | NEW, PREPARING, READY, STARTING, RUNNING, DRAINING, COMPLETED, INTERRUPTED or FAILED |
+| `generation` | Nonempty Unicode scalar string for an active generation; null only for NEW/FAILED/INTERRUPTED with no established generation |
+| `sequence` | Positive built-in integer, increasing for fresh observations |
+| `cleanup` | PENDING, CONFIRMED or UNKNOWN; separate from lifecycle |
+| `evidence` | Exactly `target_data_complete`, `output_published`, `eod_complete`, each a boolean |
+| `error` | Null or nonempty Unicode scalar string |
+| `action_outcomes` | Outcomes for requested pending IDs only, for this participant |
+
+The first matching prepare result establishes generation, including a result
+with an explicitly uncertain action outcome; it does not turn UNKNOWN into
+APPLIED. Reconciliation/stop can establish it from an authoritative APPLIED
+pending prepare outcome. Later generation changes require explicit resolution;
+there is no automatic adoption or restart.
+
+Older sequences supply no state, action, progress or cleanup facts. An identical
+observation at the same sequence does not renew freshness. A contradictory
+observation at that sequence is rejected. The observation comparison excludes
+query/action envelopes, so a query may resolve a pending action without claiming
+a fresh lifecycle observation. Terminal lifecycle states cannot regress.
+STARTING/RUNNING/COMPLETED reports require a dispatched, authorized start intent;
+they cannot upgrade a merely prepared run into a running one.
+
+An authoritative NOT_APPLIED is distinct from a timeout. For prepare/start it
+causes startup rollback, unless a human stop already cancelled the action; that
+cancellation is not a fabricated instance failure. UNKNOWN or NOT_APPLIED cleanup
+may be retried with the same action ID. Prepare/start is never retried that way.
+A report that simultaneously claims an active/completed state and a rejected or
+unapplied start is a protocol conflict; it cannot trigger rollback of healthy peers.
+This check also applies when an identical lifecycle sequence resolves pending
+action outcomes. Valid APPLIED resolution at that sequence does not renew
+freshness; older sequences supply no action facts at all.
+
+## State and failure policy
+
+All participants need fresh READY reports before the first start. Before each
+remaining dispatch, still-unarmed participants must remain fresh READY, and
+already-acknowledged peers may be STARTING or RUNNING. A STARTING acknowledgement
+is valid arming evidence; it is not proof that processing began atomically.
+A partially armed run remains STARTING while another required participant is
+READY/STARTING. If a reply is lost, unsent starts are suppressed and reconciliation
+does not launch the remaining peers automatically. The explicit recovery path is
+inspect/reconcile and human stop; v1 has no resume-start API.
+
+Preparation/start rejection causes rollback of all possibly-owned resources.
+Unreachable rollback targets remain unknown and keep the run unfinished.
+After running is observed, a runtime-local failure cleans only that participant;
+healthy peers continue. Its original frequency assignment and error history are
+retained. Communication loss alone sends no stop and does not mark processing
+failed. Failed and unknown participant lists remain separate even when health
+is DEGRADED, so one summary flag cannot hide both conditions.
+An INTERRUPTED report without human-stop or startup-rollback intent is likewise
+a local failure, even if cleanup is already confirmed. Its host error is retained
+(or an explicit unexpected-interruption error is recorded), along with the missing
+frequency assignment. Only its pending cleanup is stopped; healthy peers continue.
+With completed peers the final result is PARTIAL_FAILED; all unexpectedly
+interrupted participants finish FAILED. Cleanup alone cannot make interruption PASS.
+
+Human stop records observation-wide intent first and prevents later starts.
+Graceful stop asks every possibly-active participant to drain. After the explicit
+drain timeout, only still-owned, unclean participants receive force stop.
+Explicit force persists as force and a later graceful request cannot downgrade
+it. Confirmed clean terminal participants receive no further stop. Unknown
+ownership/cleanup stays explicit; there is no elapsed-time cleanup-PASS inference.
+
+Normal completion requires terminal COMPLETED plus target-data processing,
+ordered output publication, EOD and confirmed cleanup. Acknowledgement or the
+scheduled wall-clock end is insufficient. Active manual stop finishes as
+INTERRUPTED even after a clean drain, retaining earlier failures. Missing
+normal target-data evidence does not block a confirmed clean manual interruption.
+Prepare/start rollback finishes FAILED. A failed shard with healthy completed
+peers finishes PARTIAL_FAILED; all-failed runs finish FAILED. A not-yet-dispatched
+NEW participant needs no cleanup under stop/rollback, and remains visibly NEW
+instead of claiming a host ran or exited it.
+
+Run phases are NEW, PREPARING, READY, STARTING, RUNNING, DRAINING and FINISHED.
+Health is OK, DEGRADED or UNKNOWN. Result is null until terminal/cleanup facts
+resolve the run, then PASS, PARTIAL_FAILED, FAILED or INTERRUPTED. A historical
+terminal result is distinct from current communication freshness.
+
+For example, a running run with one failed shard exposes:
+
+```json
+{
+  "run_id": "run-a",
+  "phase": "RUNNING",
+  "health": "DEGRADED",
+  "result": null,
+  "failed_instances": [{"server_id": "node-a", "gpu_id": 0}],
+  "unknown_instances": [],
+  "missing_frequency": [{
+    "server_id": "node-a", "gpu_id": 0,
+    "assignment": {"server_id": "node-a", "gpu_id": 0, "first_channel_id": 100,
+                   "nchan": 4, "deployment_profile": "example-node-a-gpu0"},
+    "data_gap_start_sample": null,
+    "data_gap_end_sample": null
+  }]
+}
+```
+
+This is an excerpt; full status also supplies revision, bundle/observation IDs,
+per-instance state, generation, last report, errors, ownership/cleanup, `fresh`
+and local `age_ns`. Unknown gap endpoints remain null. No live data rates or
+sample progress are fabricated by this stage.
+
+## Restart policy and tests
+
+Only JSON snapshots/revisions are durable. Local monotonic timestamps are never
+persisted or subtracted across controller processes. Reopening makes prior
+liveness stale until increasing, matching reports arrive. A duplicate cached
+report cannot become fresh merely because a new controller read it.
+
+A graceful drain interrupted by restart receives a new bounded reconciliation
+window, starting with the new process's first cleanup reconciliation. It does
+not inherit an old monotonic deadline or infer success. Repeated crashes can
+extend this conservative window; v1 deliberately has no external deadline/HA
+service. Explicit force remains force. Stop/rollback/failed-instance cleanup can
+advance after identity queries, but no prepare/start is automatically replayed.
+
+Direct tests from the repository root:
+
+```bash
+python3 -B -m unittest discover -s tests -p multiserver_store_test.py -v
+python3 -B -m unittest discover -s tests -p multiserver_controller_test.py -v
+```
+
+Local portable CTest configuration uses the observed matching tool pair:
+
+```bash
+/opt/homebrew/bin/cmake -S . -B build-ms06-offline \
+  -DBUILD_TESTING=ON -DBUILD_RDMA_PIPELINE=OFF -DUSE_CUDA=OFF \
+  -DBUILD_SSD_BENCHMARK=OFF
+/opt/homebrew/bin/ctest --test-dir build-ms06-offline \
+  -R '^multiserver_(store|controller)_test$' --no-tests=error --output-on-failure
+```
+
+These two registered tests are pure Python and require no compiled target.
+This filter does not imply unrelated C++ targets were built or tested. Existing
+pure model/deployment/weights/bundle suites remain regression gates. The
+controller fixture generates a real small two-shard MS-04 bundle, then uses
+stateful fake hosts and clocks for positive, failure, crash and restart paths.
+No actual transport, resource creation or old performance runner is exercised.
+
+After independent review, the coordinator freezes source identity and hands the
+stage to the GPU-server testing task. Linux offline acceptance checks the target
+Python/sqlite/CMake environment and runs the new registered tests three clean
+consecutive times; it creates no rings, uses no GPU/RDMA and generates no network
+traffic. Real supervision/transport and live metrics remain later stages.

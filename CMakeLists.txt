@@ -505,7 +505,7 @@ if(BUILD_TESTING)
     set_tests_properties(pipeline_config_rejects_legacy_test
         PROPERTIES WILL_FAIL TRUE)
     if(Python3_Interpreter_FOUND)
-        foreach(multiserver_suite model deployment weights bundle)
+        foreach(multiserver_suite model deployment weights bundle store controller)
             add_test(
                 NAME multiserver_${multiserver_suite}_test
                 COMMAND ${Python3_EXECUTABLE} -B -m unittest discover
