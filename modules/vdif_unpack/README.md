@@ -30,7 +30,7 @@ coordinator-owned ordering decisions:
    `ParsedRecordDescriptor` arrays;
 2. the coordinator visits descriptors in original record order, updates
    watermarks, resolves duplicates and reserves unique destinations;
-3. workers copy accepted 4096-byte payloads into distinct window slots;
+3. workers copy accepted payloads of the resolved packet size into distinct window slots;
 4. the coordinator finalizes ordered window leases;
 5. the writer alone acquires, fills and commits compute-ring blocks.
 
@@ -48,9 +48,9 @@ circular wrap, and submits only valid bytes for the final partial block.
 ## Ordering, loss and statistics
 
 Watermark decisions use all configured Stations. One leading Station cannot
-evict data that a lagging Station may still deliver; a Station process that
-fails to participate aborts the observation at the controller level. Within a
-live observation, late/missing/duplicate/invalid/unknown/out-of-range records
+evict data that a lagging Station may still deliver. Instance participation and
+failure isolation belong to the multi-server controller, not this algorithm.
+Within a live transfer, late/missing/duplicate/invalid/unknown/out-of-range records
 follow the configured count, drop and zero-fill policy.
 
 Statistics cover received/accepted records, decode rejects, duplicates, late
@@ -60,6 +60,5 @@ service time. No per-packet logging occurs in the measured path.
 
 CPU correctness uses deterministic `SyntheticVdifSource` arrival profiles and
 independent byte-level golden data. PSRDADA lifecycle and affinity are composed
-by `apps/vdif_unpack_worker`; the direct receiver boundary and current rate
-evidence are summarized in
-[`../../docs/VDIF_UNPACK_STATUS.md`](../../docs/VDIF_UNPACK_STATUS.md).
+by `apps/vdif_unpack_worker`; process and ring boundaries are described in
+[the data-plane architecture](../../doc/PIPELINE_ARCHITECTURE.md).

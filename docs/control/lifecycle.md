@@ -289,3 +289,127 @@ stage to the GPU-server testing task. Linux offline acceptance checks the target
 Python/sqlite/CMake environment and runs the new registered tests three clean
 consecutive times; it creates no rings, uses no GPU/RDMA and generates no network
 traffic. Real supervision/transport and live metrics remain later stages.
+
+## SSH command transport (MS-07a)
+
+`scripts/multiserver/transport.py` provides the existing adapter interface:
+
+```python
+SSHHostAdapter(endpoints, *, ssh_path, timeout_seconds)
+adapter.send((server_id, gpu_id), command) -> dict
+```
+
+`endpoints` is a nonempty trusted deployment dictionary keyed by server ID.
+Each entry contains exactly `ssh_host`, `python_path`, `host_entrypoint` and
+`known_hosts_file`. The first is a hostname/SSH alias, optionally `user@host`;
+IP literals with colons and arbitrary SSH options are not accepted. The paths
+are absolute Unicode scalar strings without control characters. The explicit
+known-hosts path is on the control host and additionally excludes quotes,
+backslashes, percent and dollar characters to prevent SSH token/environment
+expansion. `ssh_path` is an explicit absolute local executable path;
+`timeout_seconds` is an explicit int/float in `(0, 3600]` seconds (one hour
+maximum), excluding bool. Out-of-range values, including finite extremes such
+as `1e308`, raise `ValueError` before any child is launched. This bounds both
+the remaining selector wait and SSH's integer connection timeout to values
+representable on the supported POSIX hosts.
+Validation checks syntax, not remote file availability. Endpoint values are
+copied at construction and cannot be selected or overridden by command fields.
+
+The instance key must be a tuple of server ID and nonnegative built-in integer
+GPU ID. The command must be a dict with exactly matching `server_id` and integer
+`gpu_id`; unknown targets and mismatches fail before any child is launched.
+Other command fields remain JSON data. Requests accept only finite JSON values,
+string keys and Unicode scalar strings; cycles, coerced keys, tuples and bytes
+are rejected. The wire form is sorted, compact UTF-8 JSON plus one newline,
+with Unicode preserved and `allow_nan=False`. The complete request including
+newline must fit 1 MiB and is validated before launch.
+
+Each call makes one direct SSH dispatch from the control host to the configured
+host. Local execution uses an argv list with `shell=False`. SSH still uses a
+remote shell: only the trusted fixed `[python_path, '-B', host_entrypoint]` is
+quoted with `shlex.quote` into its command string. Runtime payload is written
+only to stdin. The adapter uses `-T`, `BatchMode=yes`,
+`StrictHostKeyChecking=yes`, an explicit quoted `UserKnownHostsFile`,
+`ConnectionAttempts=1` and an integer `ConnectTimeout` in `[1, 3600]`, rounded
+up from the request timeout. It enrolls no keys and edits no SSH settings. Run the
+adapter on HF for the observed HF→qths1 topology; it contains no nested SSH.
+
+A monotonic deadline covers request encoding, child launch, stdin writes,
+stdout/stderr reads, child exit and response decoding. Nonblocking POSIX pipes
+and a selector prevent blocked stdin or a noisy stream from starving the other
+streams. Each output stream is limited separately to 1 MiB during reading;
+stderr is counted and discarded, and stdout is buffered only within its limit.
+Synchronous validation/JSON work and OS child creation check the deadline at
+boundaries; they are not themselves preemptible. Timeout raises `TimeoutError`.
+Launch, early stdin close, connection and nonzero exit (including SSH exit255)
+raise `OSError`. Output overflow and invalid protocol raise `ValueError`.
+Responses must be one strict UTF-8 JSON object: duplicate keys at any depth,
+nonfinite numbers (including overflowing exponents), lone surrogates, banners,
+truncated JSON and trailing non-whitespace data are refused. Response identity,
+state and generation validation remain with MS-06.
+
+There is no implicit retry. On every outcome the adapter closes its pipes and
+reaps its local child, killing that child on timeout/overflow if still running.
+This neither confirms remote cancellation nor issues a remote cleanup command.
+A remote action may already have applied. Errors omit payload, endpoint paths
+and stderr text; the adapter writes no logs. MS-06 retains its recorded action
+uncertainty for transport and protocol failures and reconciles by identity,
+without replaying prepare/start or stopping healthy processing for connection
+loss. This transport does not supply host deduplication or a production
+supervisor; those are MS-07b dependencies. It makes no observation/ring/GPU
+operations itself and does not establish disconnect survival.
+
+Local development checks (no actual SSH):
+
+```bash
+python3 -B -m unittest discover -s tests -p multiserver_transport_test.py -v
+python3 -B -m unittest discover -s tests -p multiserver_controller_test.py -v
+python3 -B -m unittest discover -s tests -p multiserver_store_test.py -v
+/opt/homebrew/bin/cmake -S . -B /tmp/rdma-ms07a-offline \
+  -DBUILD_TESTING=ON -DBUILD_RDMA_PIPELINE=OFF -DUSE_CUDA=OFF \
+  -DBUILD_SSD_BENCHMARK=OFF
+/opt/homebrew/bin/ctest --test-dir /tmp/rdma-ms07a-offline \
+  -R '^multiserver_(store|controller|transport)_test$' \
+  --no-tests=error --output-on-failure
+```
+
+The tests substitute only the SSH launch boundary, exercising real local Python
+children for JSON, output bounds, blocked stdin, timeout and exit. Each local
+child must be reaped with closed pipes. Controller integration uses a real
+SQLite store, the existing stateful host double and the real transport to lose
+replies after simulated application, then reopen/reconcile without replay.
+Local PASS is development evidence, not a replacement for server gates.
+
+The server test owner synchronizes the frozen source, including
+`tests/fixtures/multiserver_transport_peer.py`, to the feature mirror on HF and
+qths1. Run the affected registered tests three clean times using the observed
+Linux CMake/CTest pair `/home/user/wy/tools/cmake-3.31.12/bin/{cmake,ctest}`.
+Then run this opt-in probe **on HF**, using the existing verified known-hosts
+file (adjust its absolute path if Phase 0's SSH configuration uses another):
+
+```bash
+cd /home/user/wy/rdma_dada-multiserver
+/usr/bin/python3 -B tests/multiserver_transport_test.py --remote-probe \
+  --ssh-path /usr/bin/ssh --ssh-host qths1 --python-path /usr/bin/python3 \
+  --host-entrypoint /home/user/wy/rdma_dada-multiserver/tests/fixtures/multiserver_transport_peer.py \
+  --known-hosts-file /home/user/.ssh/known_hosts --timeout-seconds 10
+```
+
+The version1 peer echoes a Unicode/metacharacter JSON object, then the probe
+sends a second JSON object selecting a deterministic exit7 failure. Success
+prints a JSON summary with `roundtrip=PASS` and `deterministic_exit7=PASS`.
+The peer never invokes lifecycle commands, starts children, creates host state
+or accesses rings, GPU, services or observation resources. It is solely a test
+fixture, and cannot substitute for the future supervisor entrypoint. Preserve
+commands, source identity, results and cleanup in the feature evidence namespace.
+Do not infer production host behavior from this probe.
+
+Acceptance on 2026-10-11: independent spec/standards review passed after bounding
+the command timeout to one hour. The qths1 registered store/controller/transport
+suites met the three-repeat gate (28/52/22 cases per suite); all three HF→qths1
+echo/exit7 probes passed with no task residue. See the original
+[server evidence](evidence/ms07a-acceptance-20261011.json) together with the
+[coordinator audit](evidence/ms07a-acceptance-audit-20261011.json), which retains
+extra repetitions and the notification-only hash change. This accepts only
+command transport; host supervision, disconnected process survival, real
+observation resources and business telemetry are still unimplemented here.

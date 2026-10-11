@@ -1,194 +1,97 @@
-# Independent ring-connected pipeline
+# 多服务器实例的数据面架构
 
-## Processing model
+全局频道分配、实例配置和集中控制见[配置指南](../docs/control/configuration.md)与
+[生命周期接口](../docs/control/lifecycle.md)。本文只定义每个 GPU 实例内部的数据面。
 
-Every process edge is one PSRDADA HDU. An HDU carries one
-header block for a transfer and a sequence of data blocks. The pipeline does
-not prepend a copy of the ASCII header to every data block.
-
-For each observation, a stage performs the following transaction:
-
-1. Acquire and parse the input header block.
-2. Copy all upstream metadata so unknown observation fields are preserved.
-3. Apply stage configuration and algorithm-derived changes to construct the
-   output header.
-4. Publish the output header before publishing output data.
-5. Read one input data block, process it, and commit one or more output blocks.
-6. Preserve block sequence/offset metadata and propagate end-of-data.
-7. Release both HDUs and return a final stage status.
-
-The output header is therefore a function of both inputs:
+## 固定进程边界
 
 ```text
-output_header = stage(input_header, configuration, algorithm_output_geometry)
-output_data   = algorithm(input_data, configuration)
+UDP/Project VDIF sender
+  → rdma2dada → raw host ring
+  → vdif_unpack_worker → compute host ring
+  → pipeline_worker → output host ring → dada_dbnull
 ```
 
-## Runtime topology
+每个实例独占一张 GPU，同时拥有独立 endpoint/flow、CPU 分配、ring key 和运行目录。
+同主机不同实例不能共享这些独占资源。每张网卡的多个 flow 可按部署使用同一物理端口，
+但仍共享该链路容量。配置生成阶段检查资源冲突，主机监管负责运行期归属。
 
-Ring names A-D in the original diagram are examples, not fixed pipeline roles.
-The configured topology consists of ring edges, optional sinks, and worker
-processes. Each worker has exactly one input ring and one output ring. Process
-boundaries are configurable, but the observation-mode algorithm order is not.
+| 边界 | 生产者 | 消费者 | 数据 |
+| --- | --- | --- | --- |
+| raw ring | rdma2dada | unpack | 32-byte Project VDIF header + TFP payload records |
+| compute ring | unpack | GPU worker | payload-only、block-scoped ATFP/CI8 |
+| output ring | GPU worker | dbnull | Beamformed/Power/coherency，按配置可积分 |
+
+当前只使用 host PSRDADA rings；GPU 中间结果留在 worker-owned device buffers，
+不设置 CUDA ring 或算法间进程边界。本期不落盘、不实现输出网络发送或下游汇合。
+
+## 接收、解包与计算
+
+接收采用一个 destination-only flow、一个 QP/CQ/接收线程，NSGE=2 将网络头写入 scratch，
+将 Project VDIF record 直接写入 raw-ring slot。
+
+unpack 使用 coordinator、parser worker pool 和单 writer。Station ID 按本实例
+ResolvedPlan 映射到固定 A 轴；时间排序、缺失判定和补零在有界 window 中完成。
+writer 按数据 ordinal 发布 compute block，ACK 后才能复用 window range。
+
+GPU worker 的固定合法链为：
 
 ```text
-NIC
-  -> RDMA2DADA
-  -> raw ring
-  -> worker process [VDIF unpack]
-  -> unpacked ring
-       |-> optional dada_dbdisk sink
-       `-> worker process [H2D, convert, beamform,
-                           power OR stokes, optional time_integrate, D2H]
-           -> processed ring
-           -> optional DADA2RDMA / dada_dbdisk / downstream worker
+H2D → ATFP CI8 转置/转换为 TFPA CF32 → Beamform
+    → [Power | coherency products] → [TimeIntegrate] → D2H
 ```
 
-The topology is configuration-driven. Each process boundary is backpressured
-by its input and output rings. Algorithm boundaries do not imply process or ring
-boundaries. Beamforming, Power and Stokes remain independent modules even when
-they execute in one process and exchange device buffers directly. Power and
-Stokes are sibling consumers of beamformed complex voltage, not consecutive
-stages. Configuration may split compatible stages into separate workers by
-inserting a ring; producing both branches requires separate readers/workers in
-the first version.
+Beamform-only 也可直接输出复电压。Power 与 coherency 是互斥分支；
+coherency 输出 AA、BB、AB_REAL、AB_IMAG，不单独发布 I/Q/U/V。
+算法约束见[模块契约](ALGORITHM_MODULE_CONTRACTS.md)。
 
-```text
-input ring
-   -> StageRunner
-      -> module 0
-      -> module 1
-      -> ...
-      -> module N
-   -> output ring
-```
+## 时间与几何
 
-Configuration selects which optional branch and integration stage are enabled,
-while the worker enforces the fixed observation order. During startup, each
-module validates the previous module's output header, memory location, datatype,
-dimensions and block geometry. An invalid composition fails before the output
-header or any output data is published.
+各实例共享观测起点、每包采样数、采样间隔、block 时间跨度与积分倍数。
+局部频道数 F 不同可以使 packet/block bytes 不同，但不能自行改变时间网格。
+权重按全局 F 轴切片，保持 P/A/B 顺序。所有 byte geometry、header 和预算由
+Observation 编译器派生，运行进程只消费同一实例的 ResolvedPlan。
 
-## Ring contracts
+跨实例进度由数据本身的采样时间决定。发布到 output ring 才算本实例输出进度；
+服务器时钟用于计划启动、超时和速率测量，不代替数据进度。
 
-| Ring | Memory | Producer | Consumer(s) | Data meaning |
-| --- | --- | --- | --- | --- |
-| A | host | RDMA2DADA | VDIF unpack | 32-byte Project VDIF header plus TFP payload records |
-| B | host, CUDA-registered by the GPU worker | VDIF unpack | configured worker and optional `dada_dbdisk` | unpacked/reordered samples without packet headers |
-| C | CUDA device | configured worker | configured GPU worker | optional process boundary in GPU memory |
-| D | host/pinned host | configured worker | DADA2RDMA or optional storage | example processed product ring |
+## Header 与 EOD
 
-A ring becomes a fan-out edge only when configuration enables multiple
-consumers. Its `dada_db -r` value equals the number of enabled independent
-readers. For example, ring B uses `-r 2` only when both a processing worker and
-`dada_dbdisk` are enabled; without disk output it normally uses `-r 1`.
+一个 HDU transfer 有 header block 和一系列 data blocks，不在每个 data block 前重复 ASCII header。
 
-Ring C is a future optional process boundary using PSRDADA's CUDA-backed data
-blocks (`dada_db -g GPU_ID`). PSRDADA requires persistence mode (`-w`) for a GPU
-ring, must be compiled with CUDA, and all producer/consumer processes must
-select a compatible CUDA device. Its header block remains host-accessible
-PSRDADA metadata; only data blocks live on the CUDA device. The current
-`pipeline_worker` connects two host rings and performs H2D/D2H inside the
-process. At startup it registers every compute-ring data block with CUDA, so
-H2D reads directly from the PSRDADA block without a separate pinned input
-staging copy. It does not yet accept a CUDA ring endpoint.
+1. 读取并验证输入 header、配置身份、数据几何和实际 ring capacity。
+2. 每个算法复制上游元数据，只更新自身负责的 stage/type/order/shape/rate。
+3. 按编译器期望核对最终 header，在第一块输出前发布。
+4. 按序处理完整或有效 partial block；数据帧和积分组不能被无声截断。
+5. 排空在途任务，提交最后有效输出并传播 EOD，再释放资源。
 
-## Header propagation across A-D
+Station 完整列表在 Observation/ResolvedPlan 中，ring header 保留 NANT、
+CONFIG_ID/GEOMETRY_ID，而不重复 STATION_IDS。header 校验失败不得发布有效输出。
 
-Every ring has its own header block. A worker reads the upstream header once per
-transfer. It then passes an in-memory metadata object through every configured
-module in order. Each module combines the current header with its own parameters
-and algorithm-derived output geometry. Only the final header is published to
-the worker's output ring, before the first output data block.
+## CUDA 与 ring 生命周期
 
-```text
-ring input header H0
-  -> module 0 header transform -> H1
-  -> module 1 header transform -> H2
-  -> ...
-  -> module N header transform -> Hout
-  -> ring output header Hout
-```
+compute ring 启动时用 PSRDADA CUDA registration 注册，H2D 直接读取 acquired block，
+没有额外 pinned input staging copy。
 
-- A header: observation metadata plus raw packet geometry, network source and
-  raw ordering.
-- B header: preserves observation fields; removes record-header bytes and
-  updates `DATA_STAGE`, `ORDER`, `RECORD_BYTES`, `RESOLUTION`, block/file size
-  and byte rate for unpacked data.
-- Device-ring header, when configured: preserves scientific geometry and adds
-  GPU/device placement, matrix/batch layout and process lineage.
-- Processed header: preserves observation identity and time reference; updates beam,
-  polarization/product, integration, output datatype/order, `RECORD_BYTES`,
-  `RESOLUTION`, `TSAMP` and byte-rate fields.
+- `SYNCHRONOUS_DIRECT/1` 为单 stream 顺序路径。
+- `STAGED_PIPELINE/N` 共用独立 H2D stream，每 slot 独占 compute stream、
+  device buffers、pinned output、事件及 sequence。
+- N≥2 使用 one-block H2D lookahead；先提交下一块 H2D，再提交前一块 compute/D2H。
+  输入 block 到 H2D 完成才可释放，不必等其整个算法链结束。
+- 完成可乱序，但一个 publisher 严格按 sequence 写 output ring；对应完成和发布之前
+  不可复用 slot。Drain/Abort 都必须安全处理尚在运行的 stream。
 
-Header update failures abort the transfer before any output data is published.
-Data-block failures mark the stage failed and propagate EOD without advertising
-a complete output transfer.
+ring 容量只缓冲抖动，不能解决持续服务率不足。配置 slot 数、stream 数不证明重叠，
+也不证明多服务器吞吐已验收。
 
-## Ownership boundaries
+## 代码职责
 
-- `pipeline/core`: dependency-free metadata, block, stage, status and state
-  machine abstractions; testable on macOS.
-- `io/psrdada`: HDU reader/writer, header codec, block leases, EOD and ring
-  validation; Linux with PSRDADA.
-- `io/rdma`: RoCE ingest and memory registration; Linux with libibverbs.
-- `modules`: algorithm implementations. CPU reference implementations remain
-  portable; CUDA implementations are enabled only on Linux servers.
-- `apps`: thin executable entry points, including a generic worker that composes
-  a configured module chain with two ring endpoints.
-- `config`: topology, transport geometry and per-stage algorithm parameters.
-- `tests`: unit tests, mock-ring tests and Linux integration tests.
+- `config`：Observation/ResolvedPlan、严格身份与几何推导。
+- `io/rdma`：NIC 接收和内存注册。
+- `io/psrdada`：header codec、HDU、block lease、容量检查与 EOD。
+- `modules`：算法及 CPU reference，不管理 ring、进程或 detached thread。
+- `apps`：本地数据面进程入口，组合算法与 IO 生命周期。
+- `scripts/multiserver`：跨实例配置、控制与传输；不复制算法实现。
 
-## Reference-code decisions
-
-The DSA beamformer demonstrates useful block-level CUDA pipelining and CUDA
-event tracking. Its practice of immediately clearing the input header and its
-lack of an output ring are not adopted.
-
-The phase-field telescope demonstrates a useful configuration-driven module
-graph. Its raw-pointer signal bus and detached-thread ownership model are
-replaced with PSRDADA ring ownership, explicit block leases, backpressure and
-EOD propagation.
-
-PSRDADA remains the authoritative implementation reference for header/data
-block lifecycle and transfer semantics.
-
-## Current GPU worker
-
-The implemented `pipeline_worker` binds its compute and output HDUs from the
-Resolved Observation Plan. It accepts `UNPACKED/ATFP/CI8` host-ring input and
-supports fixed, compatibility-checked chains:
-
-```text
-H2D + ATFP CI8→TFPA CF32 conversion/transpose
-  → Beamform
-  → Power OR coherency products (AA, BB, AB_REAL, AB_IMAG)
-  → optional TimeIntegrate (SUM or MEAN)
-  → D2H
-```
-
-The output header is published only after input/output metadata, module,
-weight, frame, transfer and full-block geometry validation. Integration length
-must divide the block time-sample count. A finite input EOD terminates the
-transfer without treating the next transfer's `OBS_OFFSET` as another input
-header for the completed observation.
-
-`SYNCHRONOUS_DIRECT` retains the single-slot reference execution path.
-`STAGED_PIPELINE` supports a configured bounded number of in-flight slots; the
-accepted production profiles use three. Each slot owns a non-blocking CUDA
-stream, device input/converted/scratch/output buffers, pinned output staging,
-CUDA completion events, byte accounting and a block sequence number. The
-entire compute ring is registered with CUDA through PSRDADA at startup, so H2D
-copies directly from the acquired ring block and input staging-copy bytes are
-zero. Completed slots may become ready out of order, but one ordered publisher
-commits them to the output ring by block sequence, preserving PSRDADA order and
-backpressure semantics.
-
-The Resolved Plan computes every stage and ring data-block geometry before data
-flow starts. Actual HDU capacities and strict input metadata are checked
-against that plan. Production A=469 Power and coherency-product Full pipelines
-have both completed the nominal 30 Gb/s, 60 s, warm-up plus three-measured-run
-acceptance campaign. GPU-only saturation and a strict same-build
-`SYNCHRONOUS_DIRECT/1` versus `STAGED_PIPELINE/3` performance ablation remain
-separate optional characterization work; they are not prerequisites for the
-already completed Full acceptance.
+多服务器启停、故障隔离与实际验收状态分别以生命周期接口和
+[项目状态](../docs/PROJECT_STATUS.md)为准。

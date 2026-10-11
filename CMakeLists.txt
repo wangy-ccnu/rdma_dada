@@ -246,9 +246,6 @@ target_link_libraries(rdma_observation_compiler PUBLIC
     rdma_module_complex_convert
     rdma_pipeline_worker_core)
 
-add_executable(pipeline_config_inspect tools/pipeline_config_inspect.cpp)
-target_link_libraries(pipeline_config_inspect PRIVATE rdma_pipeline_config)
-
 add_executable(packet_format_inspect tools/packet_format_inspect.cpp)
 target_link_libraries(packet_format_inspect PRIVATE rdma_pipeline_config)
 
@@ -256,10 +253,6 @@ add_executable(observation_config_compile
     tools/observation_config_compile.cpp)
 target_link_libraries(observation_config_compile PRIVATE
     rdma_observation_compiler)
-
-add_executable(pipeline_worker_config_inspect
-    tools/pipeline_worker_config_inspect.cpp)
-target_link_libraries(pipeline_worker_config_inspect PRIVATE rdma_pipeline_core)
 
 add_executable(fpga_sender_sim apps/fpga_sender_sim/main.cpp)
 target_link_libraries(fpga_sender_sim PRIVATE rdma_vdif_sender_sim)
@@ -435,7 +428,6 @@ if(BUILD_TESTING)
     add_test(
         NAME vdif_unpack_config_test
         COMMAND vdif_unpack_config_test
-                ${CMAKE_CURRENT_SOURCE_DIR}/config/vdif_unpack.example.json
                 ${CMAKE_CURRENT_SOURCE_DIR}/config/observation.example.json
                 ${CMAKE_CURRENT_SOURCE_DIR}/config/packet_formats/frontend.example-v1.json)
     add_test(
@@ -466,8 +458,7 @@ if(BUILD_TESTING)
     add_test(NAME udp_vdif_sender_test COMMAND udp_vdif_sender_test)
     add_test(
         NAME pipeline_config_test
-        COMMAND pipeline_config_test
-                ${CMAKE_CURRENT_SOURCE_DIR}/config/pipeline.example.json)
+        COMMAND pipeline_config_test)
     add_test(
         NAME observation_config_test
         COMMAND observation_config_test
@@ -490,22 +481,8 @@ if(BUILD_TESTING)
         NAME packet_format_config_test
         COMMAND packet_format_config_test
                 ${CMAKE_CURRENT_SOURCE_DIR}/config/packet_formats/frontend.example-v1.json)
-    add_test(
-        NAME pipeline_config_inspect_test
-        COMMAND pipeline_config_inspect
-                ${CMAKE_CURRENT_SOURCE_DIR}/config/pipeline.example.json)
-    add_test(
-        NAME pipeline_worker_config_inspect_test
-        COMMAND pipeline_worker_config_inspect
-                ${CMAKE_CURRENT_SOURCE_DIR}/config/pipeline_worker.example.json)
-    add_test(
-        NAME pipeline_config_rejects_legacy_test
-        COMMAND pipeline_config_inspect
-                ${CMAKE_CURRENT_SOURCE_DIR}/config/pipeline.example.conf)
-    set_tests_properties(pipeline_config_rejects_legacy_test
-        PROPERTIES WILL_FAIL TRUE)
     if(Python3_Interpreter_FOUND)
-        foreach(multiserver_suite model deployment weights bundle store controller)
+        foreach(multiserver_suite model deployment weights bundle store controller transport)
             add_test(
                 NAME multiserver_${multiserver_suite}_test
                 COMMAND ${Python3_EXECUTABLE} -B -m unittest discover
@@ -553,14 +530,6 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/packet_format_inspect_test.py
                     ${CMAKE_CURRENT_BINARY_DIR}/packet_format_inspect
                     ${CMAKE_CURRENT_SOURCE_DIR}/config/packet_formats/frontend.example-v1.json)
-        add_test(
-            NAME config_conversion_test
-            COMMAND ${Python3_EXECUTABLE}
-                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/config_conversion_test.py
-                    ${CMAKE_CURRENT_SOURCE_DIR}/scripts/convert_config_to_json.py
-                    $<TARGET_FILE:pipeline_config_inspect>
-                    ${CMAKE_CURRENT_SOURCE_DIR}/config/pipeline.example.conf
-                    ${CMAKE_CURRENT_SOURCE_DIR}/config/pipeline.example.json)
         add_test(
             NAME beamform_test_weights_generator_test
             COMMAND ${Python3_EXECUTABLE}
@@ -619,7 +588,6 @@ if(BUILD_TESTING)
     add_test(
         NAME pipeline_worker_core_test
         COMMAND pipeline_worker_core_test
-                ${CMAKE_CURRENT_SOURCE_DIR}/config/pipeline_worker.example.json
                 ${CMAKE_CURRENT_BINARY_DIR}/pipeline_worker_test_weights.npy)
     add_test(NAME gpu_block_pipeline_interface_test
         COMMAND gpu_block_pipeline_interface_test)

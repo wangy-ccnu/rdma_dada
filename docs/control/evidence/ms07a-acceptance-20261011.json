@@ -1,0 +1,76 @@
+{
+  "task": "MS-07a SSH command transport acceptance",
+  "coordinator_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "executor_thread_id": "019fbb68-ae6f-77f0-bfdd-30bc30bd6c45",
+  "source_worktree": "/Users/ywang/WorkFile/code/rdma_dada/.worktrees/multi-server-observation",
+  "branch": "codex/multi-server-observation",
+  "base_head": "78b909e854b5de142c0072a6acb0a4b85a54e0fa",
+  "source_manifest": {
+    "path": "config/testing/multiserver-source-manifest.sha256",
+    "sha256": "3ed01d0f76a147f75b41d7f86c7a2c5ee91b30de0c389353e44d5afd4e31824b",
+    "entries": 328,
+    "hf_check": {"exit_code": 0, "count": 328},
+    "qths_check": {"exit_code": 0, "count": 328},
+    "key_files": {
+      "scripts/multiserver/transport.py": "abc1dd682302a3f5aff9daf1bdf83515778d905f9c9e532215697df85e237bec",
+      "tests/multiserver_transport_test.py": "2f7d65c825cd9ba08f3698686a32a2ac8b852d3ee936cf6933d2e8e026ede204",
+      "tests/fixtures/multiserver_transport_peer.py": "b5ec853e12489c621b2d88c8a8c76c8ebc0a802c393441c7fd3040889ed9b7df"
+    }
+  },
+  "mirror": {
+    "local_to_hf": "/home/user/wy/rdma_dada-multiserver",
+    "hf_to_qths": "/home/user/wy/rdma_dada-multiserver",
+    "excluded": ["/.git", "/.staging/", "/.worktrees/", "/.agents/", "/.superpowers/", "/.claude/", "/.github/", "/paper/", "/test-results/", "/build*/", "/data/", "/data_out/", "/scripts/data_out/"],
+    "qtp": "NOT_IN_SCOPE",
+    "canonical_paper_source_touched": false
+  },
+  "build": {
+    "host": "qths1",
+    "source": "/home/user/wy/rdma_dada-multiserver",
+    "path": "/home/user/wy/build-ms07a-transport-20261011",
+    "configure_exit_code": 0,
+    "cmake": "/home/user/wy/tools/cmake-3.31.12/bin/cmake 3.31.12",
+    "ctest": "/home/user/wy/tools/cmake-3.31.12/bin/ctest 3.31.12",
+    "options": ["-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTING=ON", "-DBUILD_RDMA_PIPELINE=OFF", "-DUSE_CUDA=OFF", "-DBUILD_SSD_BENCHMARK=OFF", "-DPython3_EXECUTABLE=/usr/bin/python3"],
+    "cxx_build": "not required; Python-only acceptance slice"
+  },
+  "registered_ctest": {
+    "tests": {
+      "multiserver_store_test": {"list_exit_code": 0, "rounds": 3, "case_count": 28, "exit_code": 0},
+      "multiserver_controller_test": {"list_exit_code": 0, "rounds": 3, "case_count": 52, "exit_code": 0},
+      "multiserver_transport_test": {"list_exit_code": 0, "rounds": 3, "case_count": 22, "exit_code": 0}
+    },
+    "total_case_executions": 306,
+    "command_correction": "Initial combined regex with ()| failed in nested SSH shell; replaced by literal -R per test. No source/product failure."
+  },
+  "transport_probe": {
+    "host": "HF -> qths1",
+    "known_hosts": {"path": "/home/user/.ssh/known_hosts", "readable_exit_code": 0, "bytes": 7548},
+    "python": "/usr/bin/python3",
+    "ssh": "/usr/bin/ssh",
+    "peer": "/home/user/wy/rdma_dada-multiserver/tests/fixtures/multiserver_transport_peer.py",
+    "peer_sha256": "b5ec853e12489c621b2d88c8a8c76c8ebc0a802c393441c7fd3040889ed9b7df",
+    "rounds": [
+      {"round": 1, "exit_code": 0, "probe_version": 1, "roundtrip": "PASS", "deterministic_exit7": "PASS", "lifecycle_commands": 0, "observation_resources": 0},
+      {"round": 2, "exit_code": 0, "probe_version": 1, "roundtrip": "PASS", "deterministic_exit7": "PASS", "lifecycle_commands": 0, "observation_resources": 0},
+      {"round": 3, "exit_code": 0, "probe_version": 1, "roundtrip": "PASS", "deterministic_exit7": "PASS", "lifecycle_commands": 0, "observation_resources": 0}
+    ],
+    "scope": "JSON-only peer; no shell, supervisor, observation resource, ring or dataflow"
+  },
+  "result_namespace": {
+    "hf": "/home/user/wy/task8c-multiserver-results/ms07a-transport-20261011",
+    "qths": "/home/user/wy/task8c-multiserver-results/ms07a-transport-20261011",
+    "owner": "user:user",
+    "purpose": "MS-07a transport evidence",
+    "retention": "retain with feature acceptance evidence"
+  },
+  "residue": {
+    "hf": {"peer_process": false, "test_process": false, "rdma_process": false, "gpu_process": false, "foreign_ipc": "pre-existing root semaphore 0x19910612 and user shared-memory segments; untouched"},
+    "qths": {"peer_process": false, "test_process": false, "rdma_process": false, "gpu_process": false, "ipc": "only pre-existing gdm shared-memory segments; no semaphore; untouched"}
+  },
+  "TEST_RESULT": "PASS",
+  "CLEANUP_RESULT": "PASS",
+  "DATAFLOW": "NOT_RUN",
+  "RESULT_NOTIFICATION": "PASS",
+  "COMMIT_PUSH_MERGE": "NOT_PERFORMED"
+}

@@ -6,13 +6,9 @@
 #include "rdma_dada/modules/vdif_unpack/vdif_unpack_config.h"
 
 #include <iostream>
-#include <fstream>
 #include <limits>
-#include <cstdio>
-#include <sstream>
 #include <string>
 
-#include <unistd.h>
 
 namespace {
 int failures = 0;
@@ -22,59 +18,38 @@ void Expect(bool condition, const std::string& message) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 4) {
-        std::cerr << "usage: vdif_unpack_config_test LEGACY_CONFIG OBSERVATION WIRE\n";
+    if (argc != 3) {
+        std::cerr << "usage: vdif_unpack_config_test OBSERVATION WIRE\n";
         return 2;
     }
     namespace unpack = rdma_dada::modules::vdif_unpack;
+    // Internal fixture for layout boundaries, independent of external JSON.
     unpack::VdifUnpackConfig config = {};
-    std::string error;
-    Expect(unpack::LoadVdifUnpackConfig(argv[1], &config, &error),
-           "example config loads: " + error);
-    Expect(config.input_key == 0xdadaU && config.output_key == 0xcacaU,
-           "hexadecimal ring keys parse");
-    Expect(config.first_channel_id == 100U, "first channel parses");
-    Expect(config.antenna_map.size() == 4U &&
-           config.antenna_map[0] == 10U && config.antenna_map[3] == 13U,
-           "Station IDs preserve antenna order");
-    Expect(config.window_blocks == 2U, "two raw-block reorder horizon");
-    Expect(!config.run_once, "example waits for consecutive transfers");
-
-    {
-        std::ifstream source(argv[1]);
-        std::ostringstream contents;
-        contents << source.rdbuf();
-        std::string invalid_json = contents.str();
-        const std::string marker = "\"schema_version\": 1,";
-        const std::string::size_type position = invalid_json.find(marker);
-        Expect(position != std::string::npos, "example contains schema marker");
-        if (position != std::string::npos) {
-            invalid_json.insert(position + marker.size(),
-                                "\n  \"unexpected\": true,");
-            std::ostringstream temp_name;
-            temp_name << "/tmp/rdma_dada_vdif_unpack_config_"
-                      << static_cast<long>(getpid()) << ".json";
-            {
-                std::ofstream temporary(temp_name.str().c_str());
-                temporary << invalid_json;
-            }
-            unpack::VdifUnpackConfig unpublished = config;
-            error.clear();
-            Expect(!unpack::LoadVdifUnpackConfig(temp_name.str(),
-                                                 &unpublished, &error),
-                   "unknown JSON field is rejected");
-            std::remove(temp_name.str().c_str());
-        }
-    }
-
+    config.input_key = 0xdadaU;
+    config.output_key = 0xcacaU;
+    config.first_channel_id = 100U;
+    config.antenna_map = {10U, 11U, 12U, 13U};
+    config.window_blocks = 2U;
+    config.max_window_bytes = 1048576U;
+    config.output_memory = "HOST";
     rdma_dada::PipelineConfig pipeline = {};
+    pipeline.nant = 4U;
+    pipeline.nchan = 24U;
+    pipeline.npol = 2U;
+    pipeline.payload_order = "TFP";
+    pipeline.utc_start = "2026-08-01-00:00:00";
+    pipeline.packet_header_bytes = 32U;
+    pipeline.packet_payload_bytes = 12288U;
+    pipeline.packet_samples = 128U;
+    pipeline.packet_nbit = 16U;
+    pipeline.sample_interval_us = 1.0;
+    pipeline.records_per_block = 16U;
+    pipeline.raw_ring_blocks = 8U;
+    pipeline.compute_ring_blocks = 8U;
     rdma_dada::PacketFormatConfig packet = {};
-    Expect(rdma_dada::LoadPipelineConfig(config.pipeline_config_path,
-                                         &pipeline, &error),
-           "referenced pipeline config loads: " + error);
-    Expect(rdma_dada::LoadPacketFormatConfig(config.packet_format_path,
-                                             &packet, &error),
-           "referenced packet format loads: " + error);
+    std::string error;
+    Expect(rdma_dada::LoadPacketFormatConfig(argv[2], &packet, &error),
+           "wire profile loads: " + error);
     unpack::VdifUnpackLayout layout = {};
     error.clear();
     Expect(unpack::ComputeVdifUnpackLayout(config, pipeline, packet,
@@ -129,8 +104,8 @@ int main(int argc, char** argv) {
     rdma_dada::PacketFormatConfig resolved_wire;
     rdma_dada::ResolvedObservationPlan plan;
     error.clear();
-    Expect(rdma_dada::LoadObservationConfig(argv[2], &observation, &error) &&
-               rdma_dada::LoadPacketFormatConfig(argv[3], &resolved_wire,
+    Expect(rdma_dada::LoadObservationConfig(argv[1], &observation, &error) &&
+               rdma_dada::LoadPacketFormatConfig(argv[2], &resolved_wire,
                                                   &error) &&
                rdma_dada::ResolveObservationPlan(observation, resolved_wire,
                                                   &plan, &error) &&

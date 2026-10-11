@@ -1,0 +1,55 @@
+{
+  "task": "MS-08 Observation unique configuration entry cleanup server acceptance",
+  "coordinator_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "executor_thread_id": "019fbb68-ae6f-77f0-bfdd-30bc30bd6c45",
+  "source_worktree": "/Users/ywang/WorkFile/code/rdma_dada/.worktrees/multi-server-observation",
+  "base_head": "78b909e854b5de142c0072a6acb0a4b85a54e0fa",
+  "manifest": {"path": "config/testing/multiserver-source-manifest.sha256", "sha256": "86c5fba8e56fffc1858c2950d003a3d5d1d0429b2430c3ffcd02bcf3452be499", "entries": 323, "hf_check_exit": 0, "qths_check_exit": 0},
+  "mirror": {"hf": "/home/user/wy/rdma_dada-multiserver", "qths": "/home/user/wy/rdma_dada-multiserver", "qtp": "NOT_IN_SCOPE", "paper_canonical_touched": false, "exclusions": ["/.git", "/.staging/", "/.worktrees/", "/.agents/", "/.superpowers/", "/.claude/", "/.github/", "/paper/", "/test-results/", "/build*/", "/data/", "/data_out/", "/scripts/data_out/"]},
+  "removed_entry_checks": {"hf": "all eight legacy config/tool paths absent", "qths": "all eight legacy config/tool paths absent"},
+  "build": {
+    "host": "qths1",
+    "source": "/home/user/wy/rdma_dada-multiserver",
+    "path": "/home/user/wy/build-observation-only-20261011",
+    "configure_exit_code": 0,
+    "cmake": "/home/user/wy/tools/cmake-3.31.12/bin/cmake 3.31.12",
+    "ctest": "/home/user/wy/tools/cmake-3.31.12/bin/ctest 3.31.12",
+    "options": ["Release", "BUILD_TESTING=ON", "BUILD_RDMA_PIPELINE=ON", "USE_CUDA=ON", "CMAKE_CUDA_COMPILER=/usr/local/cuda-12.8/bin/nvcc", "CMAKE_CUDA_ARCHITECTURES=86", "PSRDADA_PREFIX=/home/user/psrdada", "Python3_EXECUTABLE=/usr/bin/python3"],
+    "cmake_cache_sha256": "9a7fe0cf3125db143b3f6d1e8f957fbf72ab24619783b48de3311d082071630f",
+    "targets_built": ["rdma2dada", "vdif_unpack_worker", "pipeline_worker", "observation_config_compile", "pipeline_config_test", "vdif_unpack_config_test", "pipeline_worker_core_test", "observation_config_test", "resolved_observation_plan_test", "config_identity_test", "observation_artifacts_test", "worker_resolved_plan_test", "dada_header_roundtrip_test", "gpu_block_pipeline_interface_test", "gpu_block_pipeline_cuda_test", "pipeline_worker_metrics_test", "pipeline_worker_cuda_chain_test", "pipeline_worker_cuda_products_test"]
+  },
+  "binary_sha256": {
+    "rdma2dada": "eae999caa9f628c8714c1388ef94d7c4ac23aa92f41a76cfddeb135b1d6fe4e9",
+    "vdif_unpack_worker": "d0573afbe9f1f87931ce4a78e0ee8e274accdbe0db70aa53b15f849f3af467c3",
+    "pipeline_worker": "eb1a921b0d5ebe282889c89f3443cf694a1b29965550c3cc9597f198a883a291",
+    "observation_config_compile": "cf7d6078a2be11c4454092cec4c1a9c5ead369d3e85d9699ee5baf8095d2df75"
+  },
+  "registered_ctest": {
+    "selection": "17 requested names, each literal -R to avoid nested SSH regex interpretation",
+    "repetitions": 3,
+    "case_count_each": 1,
+    "tests": {
+      "pipeline_config_test": "PASS", "vdif_unpack_config_test": "PASS", "pipeline_worker_core_test": "PASS", "observation_config_test": "PASS", "resolved_observation_plan_test": "PASS", "config_identity_test": "PASS", "observation_artifacts_test": "PASS", "observation_config_compile_test": "PASS", "worker_resolved_plan_test": "PASS", "dada_header_roundtrip_test": "PASS", "gpu_block_pipeline_interface_test": "PASS", "gpu_block_pipeline_cuda_test": "PASS", "pipeline_worker_metrics_test": "PASS", "pipeline_worker_cuda_chain_test": "PASS", "pipeline_worker_cuda_products_test": "PASS", "multiserver_compile_test": "PASS", "multiserver_compiler_unit_test": "PASS"
+    },
+    "total_case_executions": 51,
+    "exit_code": 0,
+    "cuda_tests": ["gpu_block_pipeline_cuda_test", "pipeline_worker_cuda_chain_test", "pipeline_worker_cuda_products_test"]
+  },
+  "harness_notes": [
+    "Combined regex through nested SSH failed because remote shell interpreted ()|; no product failure.",
+    "A temporary-script workaround was rejected by execution policy; no temporary script was staged or used.",
+    "Literal registered CTest commands were used instead; output showed exactly one requested test per selector."
+  ],
+  "residue": {"qths_project_processes": false, "qths_gpu_apps": false, "qths_semaphores": "empty", "qths_shared_memory": "only pre-existing gdm segments, untouched", "rings_created": false},
+  "result_root": "/home/user/wy/task8c-multiserver-results/ms08-observation-cleanup-20261011",
+  "TEST_RESULT": "PASS",
+  "CLEANUP_RESULT": "PASS",
+  "DATAFLOW": "NOT_RUN",
+  "COMMIT_PUSH_MERGE": "NOT_PERFORMED",
+  "RESULT_NOTIFICATION": "FAIL",
+  "notification": {
+    "target_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+    "attempts": 2,
+    "reason": "send_message_to_thread rejected both attempts because the destination was not the user-authorized callback thread"
+  }
+}

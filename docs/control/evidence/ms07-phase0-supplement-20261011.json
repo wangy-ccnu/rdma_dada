@@ -1,0 +1,65 @@
+{
+  "task": "MS-07 P3 Phase0 read-only supplement",
+  "coordinator_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "base_evidence": "ms07-phase0-20261011.json",
+  "scope": "No sync, build, CTest, rings, capability, supervisor or dataflow",
+  "tool_commands": [
+    {"host": "HF", "argv": ["/usr/bin/python3", "--version"], "exit_code": 0, "output": "Python 3.8.10"},
+    {"host": "HF", "argv": ["/usr/bin/ssh", "-V"], "exit_code": 0, "output": "OpenSSH_8.2p1 Ubuntu-4ubuntu0.13, OpenSSL 1.1.1f"},
+    {"host": "qths1", "argv": ["/usr/bin/python3", "--version"], "exit_code": 0, "output": "Python 3.8.10"},
+    {"host": "qths1", "argv": ["/usr/bin/ssh", "-V"], "exit_code": 0, "output": "OpenSSH_8.2p1 Ubuntu-4ubuntu0.13, OpenSSL 1.1.1f"},
+    {"host": "qths1", "argv": ["/usr/bin/setsid", "--version"], "exit_code": 0, "output": "util-linux 2.34"},
+    {"host": "qths1", "argv": ["/usr/bin/nohup", "--version"], "exit_code": 0, "output": "GNU coreutils 8.30"},
+    {"host": "qths1", "argv": ["/usr/bin/systemd-run", "--version"], "exit_code": 0, "output": "systemd 245 (245.4-4ubuntu3.24)"},
+    {"host": "qths1", "argv": ["/usr/bin/systemd-run", "--help"], "exit_code": 0, "key_options": ["--user", "--scope", "--no-block", "--remain-after-exit", "--wait", "--send-sighup", "--pipe", "--collect"]},
+    {"host": "qths1", "argv": ["/usr/bin/setsid", "--help"], "exit_code": 0, "key_options": ["--fork", "--wait", "--ctty"]},
+    {"host": "qths1", "argv": ["/usr/bin/nohup", "--help"], "exit_code": 0, "key_options": ["--help", "--version"]}
+  ],
+  "proc_identity": {
+    "argv": ["/bin/cat", "/proc/self/stat"],
+    "exit_code": 0,
+    "sample": {"pid": 46473, "comm": "cat", "state": "R", "ppid": 46472, "pgid": 46473, "sid": 46473, "starttime_ticks": 145205673},
+    "boot_id": "94b31538-146c-4b51-bf73-95bc87d08632",
+    "proc_mount": "proc on /proc type proc (rw,nosuid,nodev,noexec,relatime)",
+    "proc_status": {"uid": 1000, "cap_eff": "0000000000000000", "cpus_allowed": "0-47", "mems_allowed": "0-1"},
+    "signal_scope": "own-UID signal scope is an OS-rule inference, not experimentally signaled"
+  },
+  "cpu_gpu_identity": {
+    "cpu_mapping": "CPU 0-11 -> core 0-11/socket0/node0; CPU 12-23 -> core 12-23/socket1/node1; CPU 24-35 -> SMT siblings core 0-11/socket0/node0; CPU 36-47 -> SMT siblings core 12-23/socket1/node1; all online",
+    "gpu_uuid": [
+      {"index": 0, "uuid": "GPU-3b1c4da5-347b-626a-ccc9-8aec1d8c905d", "pci": "00000000:3B:00.0", "name": "NVIDIA GeForce RTX 3090"},
+      {"index": 1, "uuid": "GPU-7884b7a9-85fa-2648-cdf6-b00f56623a8d", "pci": "00000000:5E:00.0", "name": "NVIDIA GeForce RTX 3090"}
+    ],
+    "argv": ["/usr/bin/lscpu", "-e=CPU,CORE,SOCKET,NODE,ONLINE"],
+    "exit_code": 0
+  },
+  "logind": {
+    "qths": {"systemctl_show": {"argv": ["systemctl", "show", "systemd-logind", "-p", "KillUserProcesses"], "exit_code": 0, "output": "empty"}, "config_grep": {"exit_code": 0, "output": "#KillUserProcesses=no"}, "linger": "no"},
+    "hf": {"systemctl_show_exit_code": 0, "output": "empty", "config_grep_exit_code": 0, "output_config": "#KillUserProcesses=no", "linger": "no"},
+    "effective_kill_user_processes": "UNKNOWN; no uncommented override was observed and no privileged effective-config query was used"
+  },
+  "directories": {
+    "hf_home_wy": {"owner": "user:user", "mode": "drwxrwxr-x", "writable_test_exit_code": 0},
+    "qths_home_wy": {"owner": "user:user", "mode": "drwxrwxr-x", "writable_test_exit_code": 0}
+  },
+  "clocks": {
+    "hf": {"timedatectl_exit_code": 0, "output": ["Timezone=Asia/Shanghai", "NTPSynchronized=yes", "TimeUSec=Sun 2026-10-11 15:07:14 CST"], "date_utc": "Sun Oct 11 07:07:14 UTC 2026", "timesync_active": true},
+    "qths1": {"timedatectl_exit_code": 0, "output": ["Timezone=Asia/Shanghai", "NTPSynchronized=yes", "TimeUSec=Sun 2026-10-11 15:07:15 CST"], "date_utc": "Sun Oct 11 07:07:16 UTC 2026", "timesync_active": true}
+  },
+  "psrdada_help": {
+    "dada_db": {"argv": ["/home/user/psrdada/bin/dada_db", "-h"], "exit_code": 0, "key_options": ["-a", "-b", "-c node", "-d destroy", "-k key", "-l", "-n", "-p", "-r", "-w", "-u", "-z"]},
+    "dada_dbnull": {"argv": ["/home/user/psrdada/bin/dada_dbnull", "-h"], "exit_code": 0, "key_options": ["-c", "-k key", "-s", "-S", "-z", "-d"]},
+    "dada_dbdisk": {"argv": ["/home/user/psrdada/bin/dada_dbdisk", "-h"], "exit_code": 0, "key_options": ["-b", "-c", "-k", "-D", "-s", "-t", "-z", "-d"], "stderr_note": "invalid option -h precedes usage; exit code still 0"}
+  },
+  "selected_binary_ldd": {
+    "pipeline_worker": {"path": "/home/user/wy/build-coherency-20260829-r2/pipeline_worker", "exit_code": 0, "resolved": ["libcudart.so.12=/usr/local/cuda-12.8/targets/x86_64-linux/lib/libcudart.so.12", "libcublas.so.12=/usr/local/cuda-12.8/targets/x86_64-linux/lib/libcublas.so.12", "libpsrdada.so.1=/home/user/psrdada/lib/libpsrdada.so.1"]},
+    "rdma2dada": {"path": "/home/user/wy/build-coherency-20260829-r2/rdma2dada", "exit_code": 0, "resolved": ["libibverbs.so.1=/lib/x86_64-linux-gnu/libibverbs.so.1", "libpsrdada.so.1=/home/user/psrdada/lib/libpsrdada.so.1", "libcudart.so.12=/usr/local/cuda/lib64/libcudart.so.12"]},
+    "vdif_unpack_worker": {"path": "/home/user/wy/build-coherency-20260829-r2/vdif_unpack_worker", "exit_code": 0, "resolved": ["libpsrdada.so.1=/home/user/psrdada/lib/libpsrdada.so.1", "libcudart.so.12=/usr/local/cuda/targets/x86_64-linux/lib/libcudart.so.12"]},
+    "dada_dbnull": {"path": "/home/user/psrdada/bin/dada_dbnull", "exit_code": 0, "resolved": ["libpsrdada.so.1=/home/user/psrdada/lib/libpsrdada.so.1", "libcudart.so.12=/usr/local/cuda/targets/x86_64-linux/lib/libcudart.so.12"]}
+  },
+  "json_stdin_and_disconnect": "UNPROVEN; no JSON stdin probe or disconnect-survival probe was started",
+  "TEST_RESULT": "DIAGNOSTIC_COMPLETE",
+  "CLEANUP_RESULT": "NOT_APPLICABLE",
+  "DATAFLOW": "NOT_RUN",
+  "RESULT_NOTIFICATION": "PASS"
+}

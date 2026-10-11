@@ -1,12 +1,7 @@
 #include "rdma_dada/config/pipeline_config.h"
-#include "rdma_dada/config/json_value.h"
 
-#include <cerrno>
 #include <cmath>
-#include <cstdlib>
-#include <fstream>
 #include <limits>
-#include <sstream>
 
 namespace rdma_dada {
 namespace {
@@ -16,45 +11,6 @@ bool Fail(const std::string& message, std::string* error) {
     return false;
 }
 
-bool ParseUint64(const std::string& key, const std::string& text,
-                 std::uint64_t* value, std::string* error) {
-    if (text.empty() || text[0] == '-') {
-        return Fail(key + " must be a non-negative integer", error);
-    }
-    errno = 0;
-    char* end = NULL;
-    const unsigned long long parsed = std::strtoull(text.c_str(), &end, 10);
-    if (errno == ERANGE || end == text.c_str() || *end != '\0') {
-        return Fail(key + " is not a valid integer: " + text, error);
-    }
-    *value = static_cast<std::uint64_t>(parsed);
-    return true;
-}
-
-bool ParseUint32(const std::string& key, const std::string& text,
-                 std::uint32_t* value, std::string* error) {
-    std::uint64_t parsed = 0;
-    if (!ParseUint64(key, text, &parsed, error)) return false;
-    if (parsed > std::numeric_limits<std::uint32_t>::max()) {
-        return Fail(key + " exceeds uint32 range", error);
-    }
-    *value = static_cast<std::uint32_t>(parsed);
-    return true;
-}
-
-bool ParseDouble(const std::string& key, const std::string& text,
-                 double* value, std::string* error) {
-    errno = 0;
-    char* end = NULL;
-    const double parsed = std::strtod(text.c_str(), &end);
-    if (errno == ERANGE || end == text.c_str() || *end != '\0' ||
-        !std::isfinite(parsed)) {
-        return Fail(key + " is not a valid finite number: " + text, error);
-    }
-    *value = parsed;
-    return true;
-}
-
 bool CheckedMultiply(std::uint64_t left, std::uint64_t right,
                      const std::string& name, std::uint64_t* result,
                      std::string* error) {
@@ -62,100 +18,6 @@ bool CheckedMultiply(std::uint64_t left, std::uint64_t right,
         return Fail(name + " exceeds uint64 range", error);
     }
     *result = left * right;
-    return true;
-}
-
-bool RequireObject(const json::Value& value, const std::string& path,
-                   const json::Value::Object** object, std::string* error) {
-    if (value.type() != json::Value::kObject) {
-        return Fail(path + " must be a JSON object", error);
-    }
-    *object = &value.object();
-    return true;
-}
-
-bool RequireExactKeys(const json::Value::Object& object,
-                      const char* const* keys, std::size_t key_count,
-                      const std::string& path, std::string* error) {
-    for (std::size_t index = 0; index < key_count; ++index) {
-        if (object.count(keys[index]) == 0U) {
-            return Fail(path + " is missing required field: " + keys[index], error);
-        }
-    }
-    for (json::Value::Object::const_iterator item = object.begin();
-         item != object.end(); ++item) {
-        bool known = false;
-        for (std::size_t index = 0; index < key_count; ++index) {
-            if (item->first == keys[index]) {
-                known = true;
-                break;
-            }
-        }
-        if (!known) return Fail(path + " has unknown field: " + item->first, error);
-    }
-    return true;
-}
-
-const json::Value& Field(const json::Value::Object& object,
-                         const std::string& key) {
-    return object.find(key)->second;
-}
-
-bool ReadUint64(const json::Value::Object& object, const std::string& key,
-                const std::string& path, std::uint64_t* output,
-                std::string* error) {
-    const json::Value& value = Field(object, key);
-    if (value.type() != json::Value::kNumber) {
-        return Fail(path + "." + key + " must be an integer", error);
-    }
-    const std::string& text = value.text();
-    if (text.find_first_of(".eE") != std::string::npos) {
-        return Fail(path + "." + key + " must use integer JSON syntax", error);
-    }
-    return ParseUint64(path + "." + key, text, output, error);
-}
-
-bool ReadUint32(const json::Value::Object& object, const std::string& key,
-                const std::string& path, std::uint32_t* output,
-                std::string* error) {
-    const json::Value& value = Field(object, key);
-    if (value.type() != json::Value::kNumber) {
-        return Fail(path + "." + key + " must be an integer", error);
-    }
-    const std::string& text = value.text();
-    if (text.find_first_of(".eE") != std::string::npos) {
-        return Fail(path + "." + key + " must use integer JSON syntax", error);
-    }
-    return ParseUint32(path + "." + key, text, output, error);
-}
-
-bool ReadDouble(const json::Value::Object& object, const std::string& key,
-                const std::string& path, double* output, std::string* error) {
-    const json::Value& value = Field(object, key);
-    if (value.type() != json::Value::kNumber) {
-        return Fail(path + "." + key + " must be a number", error);
-    }
-    return ParseDouble(path + "." + key, value.text(), output, error);
-}
-
-bool ReadString(const json::Value::Object& object, const std::string& key,
-                const std::string& path, std::string* output,
-                std::string* error) {
-    const json::Value& value = Field(object, key);
-    if (value.type() != json::Value::kString) {
-        return Fail(path + "." + key + " must be a string", error);
-    }
-    *output = value.text();
-    return true;
-}
-
-bool ReadBool(const json::Value::Object& object, const std::string& key,
-              const std::string& path, bool* output, std::string* error) {
-    const json::Value& value = Field(object, key);
-    if (value.type() != json::Value::kBoolean) {
-        return Fail(path + "." + key + " must be true or false", error);
-    }
-    *output = value.boolean();
     return true;
 }
 
@@ -172,112 +34,6 @@ bool RoundedRate(std::uint64_t bytes, long double packet_seconds,
 }
 
 }  // namespace
-
-bool LoadPipelineConfig(const std::string& path,
-                        PipelineConfig* config,
-                        std::string* error) {
-    if (!config) return Fail("config output pointer is null", error);
-
-    std::ifstream input(path.c_str());
-    if (!input) return Fail("cannot open config file: " + path, error);
-
-    std::ostringstream contents;
-    contents << input.rdbuf();
-    if (input.bad()) return Fail("failed while reading config file: " + path, error);
-
-    json::Value root;
-    if (!json::Parse(contents.str(), &root, error)) return false;
-    const json::Value::Object* root_object = NULL;
-    if (!RequireObject(root, "root", &root_object, error)) return false;
-    static const char* const root_keys[] = {
-        "schema_version", "observation", "packet", "ring_buffers", "disk"
-    };
-    if (!RequireExactKeys(*root_object, root_keys,
-                          sizeof(root_keys) / sizeof(root_keys[0]),
-                          "root", error)) return false;
-
-    std::uint32_t schema_version = 0;
-    if (!ReadUint32(*root_object, "schema_version", "root",
-                    &schema_version, error)) return false;
-    if (schema_version != 1U) {
-        return Fail("unsupported pipeline config schema_version: " +
-                    Field(*root_object, "schema_version").text(), error);
-    }
-
-    const json::Value::Object* observation = NULL;
-    const json::Value::Object* packet = NULL;
-    const json::Value::Object* ring_buffers = NULL;
-    const json::Value::Object* disk = NULL;
-    if (!RequireObject(Field(*root_object, "observation"), "observation",
-                       &observation, error) ||
-        !RequireObject(Field(*root_object, "packet"), "packet",
-                       &packet, error) ||
-        !RequireObject(Field(*root_object, "ring_buffers"), "ring_buffers",
-                       &ring_buffers, error) ||
-        !RequireObject(Field(*root_object, "disk"), "disk", &disk, error)) {
-        return false;
-    }
-    static const char* const observation_keys[] = {
-        "nant", "nchan", "npol", "payload_order", "utc_start"
-    };
-    static const char* const packet_keys[] = {
-        "header_bytes", "payload_bytes", "samples", "nbit",
-        "sample_interval_us"
-    };
-    static const char* const ring_keys[] = {
-        "records_per_block", "raw_blocks", "compute_blocks"
-    };
-    static const char* const disk_keys[] = {
-        "enabled", "blocks_per_file", "direct_io"
-    };
-    if (!RequireExactKeys(*observation, observation_keys,
-                          sizeof(observation_keys) / sizeof(observation_keys[0]),
-                          "observation", error) ||
-        !RequireExactKeys(*packet, packet_keys,
-                          sizeof(packet_keys) / sizeof(packet_keys[0]),
-                          "packet", error) ||
-        !RequireExactKeys(*ring_buffers, ring_keys,
-                          sizeof(ring_keys) / sizeof(ring_keys[0]),
-                          "ring_buffers", error) ||
-        !RequireExactKeys(*disk, disk_keys,
-                          sizeof(disk_keys) / sizeof(disk_keys[0]),
-                          "disk", error)) {
-        return false;
-    }
-
-    PipelineConfig parsed = PipelineConfig();
-    if (!ReadUint32(*observation, "nant", "observation", &parsed.nant, error) ||
-        !ReadUint32(*observation, "nchan", "observation", &parsed.nchan, error) ||
-        !ReadUint32(*observation, "npol", "observation", &parsed.npol, error) ||
-        !ReadString(*observation, "payload_order", "observation",
-                    &parsed.payload_order, error) ||
-        !ReadString(*observation, "utc_start", "observation",
-                    &parsed.utc_start, error) ||
-        !ReadUint64(*packet, "header_bytes", "packet",
-                    &parsed.packet_header_bytes, error) ||
-        !ReadUint64(*packet, "payload_bytes", "packet",
-                    &parsed.packet_payload_bytes, error) ||
-        !ReadUint64(*packet, "samples", "packet",
-                    &parsed.packet_samples, error) ||
-        !ReadUint32(*packet, "nbit", "packet", &parsed.packet_nbit, error) ||
-        !ReadDouble(*packet, "sample_interval_us", "packet",
-                    &parsed.sample_interval_us, error) ||
-        !ReadUint64(*ring_buffers, "records_per_block", "ring_buffers",
-                    &parsed.records_per_block, error) ||
-        !ReadUint64(*ring_buffers, "raw_blocks", "ring_buffers",
-                    &parsed.raw_ring_blocks, error) ||
-        !ReadUint64(*ring_buffers, "compute_blocks", "ring_buffers",
-                    &parsed.compute_ring_blocks, error) ||
-        !ReadBool(*disk, "enabled", "disk", &parsed.disk_enabled, error) ||
-        !ReadUint64(*disk, "blocks_per_file", "disk",
-                    &parsed.file_blocks, error) ||
-        !ReadBool(*disk, "direct_io", "disk", &parsed.direct_io, error)) {
-        return false;
-    }
-
-    *config = parsed;
-    return true;
-}
 
 bool ComputePipelineLayout(const PipelineConfig& config,
                            PipelineLayout* layout,

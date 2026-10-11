@@ -1,189 +1,89 @@
-# RDMA/PSRDADA Pipeline
+# RDMA/PSRDADA 实时天线阵列处理系统
 
-该项目正在重构为独立的 PSRDADA ring-connected 实时天线阵列处理 pipeline。当前已实现
-统一 Observation/Resolved Plan、RoCE v2 ingest、Project VDIF TFP→ATFP 解包、GPU 上的
-ATFP→TFPA 转换，以及 Beamform、Power/Stokes、Time Integration 组成的双 ring
-`pipeline_worker`。功能、数值和 PSRDADA/CUDA 集成已经通过对应服务器验收；
-`rdma2dada` receive-only 和 `rdma2dada + vdif_unpack_worker` 已分别完成 30 Gbps、
-60 秒、1 warm-up + 3 measured 的正式重复门禁。当前双 Station 小几何完整链也已完成
-30 Gbps、60 秒、1 warm-up + 3 measured 的正式重复门禁；该结果不代表约 500 Station
-生产矩阵、多 GPU 扩展或 20% 实测 headroom 已验收。
+本项目面向连续天文观测数据，结合 RDMA 接收、PSRDADA 共享内存 ring 和
+CUDA 计算，实现多阵元数据的并行解包、波束形成、功率或偏振相关乘积计算及积分。
 
-各应用、算法、配置、测试和后续工作的统一状态见
-[docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)。
+系统以 Observation 为统一配置入口，以服务器/GPU 为处理单元按频段分工。
+数据处理与上位控制分层：计算流水线负责本地实时处理，控制层负责全局配置、
+集中启停和业务状态管理。各功能的实际支持范围见[项目状态](docs/PROJECT_STATUS.md)。
 
-## 当前数据契约
-
-- 用户只维护 Observation JSON；编译后的 `resolved_observation.json` 是各进程共同的
-  运行契约。编译器同时生成 RAW、UNPACKED、CONVERTED、BEAMFORMED 和最终产品 header
-  （没有处理模块时只生成前两级）。`NANT`/`NCHAN`/`NPOL`、`PKT_TSAMP`、`UTC_START`
-  和 ring/file 几何不写死。
-- raw ring 中的每条 record 是 `32-byte Project VDIF v1 header + TFP payload`。RoCE 接收缓冲区中额外的 Ethernet/IPv4/UDP 42 字节会在写 ring 前剔除。
-- PSRDADA 的 header block 描述一次 transfer；数据 block 不会重复前缀 ASCII header。
-- 一个解包/计算 block 包含所有 `A` 个阵元的数据。总 UDP record 数必须是 `A` 的
-  整数倍；`T=PKT_NSAMP×每阵元每block的UDP包数`。
-- `.dada` 文件大小由 `blocks_per_file` 配置，因此是 ring data block 大小的整数倍。
-- 当前 RDMA ingest 使用一个 QP/CQ/接收线程和 NSGE=2：42-byte Ethernet/IPv4/UDP header
-  写入固定 scratch，Project VDIF record 由 RNIC 直接写入 PSRDADA raw-ring slot。接收端
-  同时持有两块 raw block 处理 WR completion、保序发布和尾块 EOD，不再执行 packet→ring
-  payload memcpy。
-
-完整的目标架构和 header 传播规则见 [doc/PIPELINE_ARCHITECTURE.md](doc/PIPELINE_ARCHITECTURE.md)。
-算法模块的输入输出、`TFPA/TFPB/TFBS` 数据布局、独立积分模块和 worker 调用规则见
-[doc/ALGORITHM_MODULE_CONTRACTS.md](doc/ALGORITHM_MODULE_CONTRACTS.md)。
-后续开发顺序、各阶段验收标准、模块输入输出门禁和配置参数扩展规则见
-[doc/DEVELOPMENT_PLAN.md](doc/DEVELOPMENT_PLAN.md)。
-
-## 分层与目录
+## 整体架构
 
 ```text
-include/rdma_dada/config/       便携 JSON 和运行参数契约
-include/rdma_dada/pipeline/     block、metadata、stage 和 DADA header 契约
-include/rdma_dada/io/rdma/      RoCE/libibverbs 适配器接口
-include/rdma_dada/io/psrdada/   PSRDADA ring/header 适配器接口
-src/config|pipeline|io/         与公共接口镜像的底层实现
-modules/                        独立算法，不持有 ring 和进程生命周期
-apps/rdma2dada/                 已实现的 NIC→raw ring 组合入口
-apps/vdif_unpack_worker/        已实现的 raw ring→ATFP compute ring 解包进程
-apps/pipeline_worker/           已实现的双 ring 模块链工作进程
-apps/dada2rdma|pipelinectl/     计划中的输出与编排入口
-tools/                          配置检查和 SSD 诊断工具
-scripts/                        最上层用户启动、构建和配置转换
-tests/                          macOS 单元测试与后续 Linux 集成测试
+全局 Observation + 部署分配 + 硬件资源清单 + 完整权重
+  → 按服务器/GPU 生成实例配置与权重
+  → 编译为统一运行契约 ResolvedPlan
+
+每个处理实例：
+  数据发送端 → RDMA 接收 → raw ring
+    → 并行解包 → compute ring
+    → GPU 转换/转置 → 波束形成 → Power 或 Coherency → 可选积分
+    → output ring → 输出消费者
 ```
 
-依赖只能向底层流动：`scripts → apps`；`apps` 负责组合 `io + pipeline + modules`；`modules` 只依赖 `pipeline/config` 契约。算法模块通过 `AlgorithmModule` 交换 metadata 和 block view，不直接调用 PSRDADA 或 libibverbs。
+- **按频段独立处理**：每张 GPU 对应一条流水线，处理用户分配的频道范围。
+  各实例共享采样时间网格和 block 时间跨度，数据块字节数随频道数派生。
+- **进程与算法解耦**：ring 连接接收、解包和 GPU worker 进程；
+  算法模块不管理网络、ring 或进程生命周期。
+- **统一数据契约**：各进程读取同一实例的 ResolvedPlan，避免分别配置
+  Station 顺序、数据布局、block 几何与 header。
+- **基于数据时间协调**：跨实例进度以数据携带的采样时间为依据，
+  不使用服务器当前时间代替观测进度。
 
-## macOS 开发
+接收使用 NSGE=2 将 Project VDIF record 直接写入 raw ring；解包按 Station→A 轴
+重排，通过多个 parser 和单 writer 保序发布。GPU worker 从 CUDA 注册的 compute
+ring 执行 H2D，完成算法链后按 block sequence 写入 output ring。
 
-macOS 不编译 libibverbs/PSRDADA/CUDA 数据面，只构建可移植部分：
+`STOKES` 产品模式输出 `AA、BB、AB_REAL、AB_IMAG` coherency 基底，
+可据此推导 I/Q/U/V，而非直接发布独立的 I/Q/U/V 数组。
+数据布局和边界详见[数据面架构](doc/PIPELINE_ARCHITECTURE.md)与
+[算法契约](doc/ALGORITHM_MODULE_CONTRACTS.md)。
+
+## 配置方式
+
+用户提供以下输入：
+
+| 输入 | 内容 |
+| --- | --- |
+| 全局 Observation | 观测开始时间与时长、Station 顺序、频道、偏振、采样/block/积分参数、产品模式和完整权重 |
+| Deployment | 服务器/GPU 频道分配，以及 CPU、NUMA、接收 flow、ring 等部署设置 |
+| Inventory | 主机、CPU/GPU、网卡/端口/MAC/MTU 及资源容量 |
+
+配置工具按 F 轴切分权重，生成每实例 `observation.json`；
+Observation 编译器据此生成 `resolved_observation.json`、ring plan 和各级 DADA
+header。派生字节数和 header 不需要手工维护，也不使用旧 standalone pipeline 配置。
+
+分配由用户根据硬件决定，配置生成不进行自动硬件发现、动态负载均衡或 FPGA 下发，
+也不会创建 ring 或启动数据流。
+输入示例、命令和路径要求见[多服务器配置指南](docs/control/configuration.md)；
+单实例字段见[Observation 配置说明](config/README.md)。
+
+## 构建与配置检查
+
+Linux 数据面依赖 libibverbs、PSRDADA、CUDA Toolkit/cuBLAS；构建使用 CMake：
+
+```bash
+BUILD_RDMA_PIPELINE=ON USE_CUDA=ON bash scripts/build.sh
+```
+
+macOS 仅构建可移植代码，不包含 RDMA、PSRDADA 或 CUDA 数据面：
 
 ```bash
 bash scripts/build.sh
-ctest --test-dir build --output-on-failure
 ```
 
-这个模式不需要 CUDA，也不要求在 macOS 安装 PSRDADA。
-
-## Linux 服务器构建
-
-服务器需要 libibverbs 开发文件与 PSRDADA。当前对照的 PSRDADA 源码版本是 `151198ea3ec4a3a237f51e6217a5a2d7ff39194e`。CUDA 不是 raw RDMA ingest 的必需依赖：
-
-```bash
-BUILD_RDMA_PIPELINE=ON USE_CUDA=OFF bash scripts/build.sh
-ctest --test-dir build --output-on-failure
-```
-
-启用 CUDA 的算法模块后，再使用 `USE_CUDA=ON`。
-
-在服务器上可以先关闭 RDMA/PSRDADA，只验证 CUDA 算法模块：
-
-```bash
-BUILD_RDMA_PIPELINE=OFF USE_CUDA=ON bash scripts/build.sh
-ctest --test-dir build -L cuda --output-on-failure
-```
-
-RTX 3090 的默认 CUDA architecture 是 `86`，可通过
-`-DCMAKE_CUDA_ARCHITECTURES=86` 显式覆盖。CUDA 构建建议使用 CMake 3.24 或更新
-版本；项目最低版本仍为 3.18。
-
-Linux 上先编译 Observation 配置，再由 worker 消费同一份 Resolved Plan：
-
-```bash
-./build/observation_config_compile config/observation.json run/observation
-./build/pipeline_worker run/observation/resolved_observation.json
-```
-
-输入必须是 host compute ring 中的 `UNPACKED/ATFP/CI8` 数据；worker 在 GPU 内完成
-ATFP→TFPA 与 CI8→CF32，再执行 Beamform 以及可选 Power/Stokes/Integration。
-输出 ring block 大小由权重 NPY 的 B 维和算法链自动推导；准确尺寸关系见
-[apps/pipeline_worker/README.md](apps/pipeline_worker/README.md)。
-
-## JSON 配置
-
-示例文件是 [config/pipeline.example.json](config/pipeline.example.json)。开始前可检查派生的 record/block/ring/file 几何：
-
-```bash
-./build/pipeline_config_inspect config/pipeline.example.json
-```
-
-Observation JSON、Resolved Plan、ring plan 和 DADA header artifact 的生成方式：
+在构建后检查单实例配置，不启动数据流：
 
 ```bash
 ./build/observation_config_compile \
-  config/observation.example.json run/observation
+  --config config/observation.example.json --preflight-only
 ```
 
-性能测试可额外传入 `--budget-payload-gbps 30`。编译器会在
-`validation_report.json.gpu_pipeline_budget` 中同时记录 Observation 速率和测试目标速率，
-并按 20% 初始安全余量计算 block deadline、每级最低吞吐、H2D+D2H 合计传输量以及显存
-计划；该预算是完整 GPU 链运行前的门禁，不等同于实测通过。
+输入引用的权重及 wire profile 必须存在。生成工件时使用
+`--output-dir <新的目录>`；配置检查和工件生成不等于运行时就绪。
 
-`config/pipeline_worker.example.json` 仅用于模块级兼容测试，不再作为应用入口。
+## 进一步阅读
 
-前端固定 32-byte Project VDIF v1 header 和 TFP payload 轴布局使用独立
-packet-format profile：
-
-```bash
-./build/packet_format_inspect \
-  config/packet_formats/frontend.example-v1.json
-```
-
-wire 字段表见 [doc/PROJECT_VDIF_PROFILE_V1.md](doc/PROJECT_VDIF_PROFILE_V1.md)，配置与轴
-表达式见 [config/packet_formats/README.md](config/packet_formats/README.md)。
-
-将旧的 shell 配置转为 JSON：
-
-```bash
-python3 scripts/convert_config_to_json.py old.conf config/pipeline.json
-```
-
-## 运行 RDMA 接收测试
-
-当前版本化测试入口是 `scripts/task8c_rate_point.py`。它按同一 resolved plan 显式组合
-`receive`、`unpack`、`gpu`、`full` 四种拓扑：GPU-only 只创建 compute/output ring，
-full 则在现有 sender→`rdma2dada`→unpack 链后复用同一个 `pipeline_worker`。控制器保存
-各阶段计数、进程身份与定向清理证据；算法模块组合仍由 `pipeline_worker` 负责，不写入
-控制器条件分支。
-`rdma2dada` 本身只保留 direct raw-ring 接收路径。
-
-## 当前限制
-
-- Linux RDMA 构建、CQ 错误路径、NIC flow steering 和有限 transfer 已有服务器验证；
-  receive-only 与 receive+unpack 已完成约 30 Gbps、60 秒、1 warm-up + 3 measured
-  正式验收。`NSGE=2` direct placement 在同档位精确闭合；staged-copy 对照出现约
-  0.54% receiver deficit，作为受控性能失败边界保留。
-- `beamform` 已有 NPY 权重加载、host FP32 reference 和异步 CUDA FP32/TF32
-  backend；`power`、`stokes`、`time_integrate` 已有 host FP32 reference 和异步
-  CUDA kernel。独立 CUDA correctness、GPU 数值组合链和 Resolved Plan 驱动的
-  PSRDADA/CUDA ring integration 已在目标服务器通过。生产几何 Full Power 和 Full
-  coherency/Stokes 均已完成约 30 Gbps、60 秒、1 warm-up + 3 measured 正式验收。
-- `host_to_device`、`device_to_host` 已实现为无 buffer 所有权的异步 CUDA 传输
-  模块，并已接入 worker。CUDA worker 在 transfer 生命周期内用 `dada_cuda_dbregister`
-  注册整个 compute ring，H2D 直接读取当前 ring block，不再执行 ring→pinned input copy；
-  输出侧仍使用每 slot 的 pinned staging，并由单 writer 按序写 output ring。
-- 观测流程固定为解析重排后执行 Beamform，再选择 Power 或 Stokes，最后按需执行
-  time integration。当前 worker 已实现 `beamform`、`beamform+power`、
-  `beamform+stokes`，以及后两条链的可选积分；整数复数转 CF32 已作为固定前缀接入
-  worker。VDIF 解包已改为 payload-only ATFP 输出并通过功能验收，通用模块 registry
-  仍待实现。
-- CUDA worker 保留 `SYNCHRONOUS_DIRECT/1` 对照路径，并已实现 1--4 个有界 slot 的
-  `STAGED_PIPELINE`：每个 slot 独占 output pinned staging、device buffers、non-blocking
-  stream 和完成事件，输入直接来自已注册的 compute ring；单 writer 按 block sequence
-  发布 output ring。模块/CUDA 门禁、1 Gbps 重复正确性和双 Station 小几何 30 Gbps、
-  60 秒完整链重复门禁均已通过；生产 Power `A=469,F=4,P=1,B=350` 与生产
-  coherency/Stokes `A=469,F=2,P=2,B=350` 也已分别通过同一重复协议。
-- GPU-only 压力路径暂缓。现有 `dada_junkdb` 路径和计划中的版本化压力 writer 不作为
-  当前完成项，也不影响已经通过的 full-chain 验收；恢复该工作时需重新确认严格 header、
-  block pacing 和生产几何契约，并完成 `SYNCHRONOUS_DIRECT/1` 与
-  `STAGED_PIPELINE/3` 的受控比较。
-- Project VDIF v1 已固定 32-byte header、TFP/IQ payload 和 Station-ID 聚合契约；
-  unpack 采用 coordinator、固定 parser worker pool 和单 compute writer，并支持显式线程
-  affinity。receive-only 与 unpack 已使用固定 CPU/NUMA、source port、ring/window 和
-  1 秒 preparation 配置，分别通过 30 Gbps、60 秒、1 warm-up + 3 measured；35 Gbps
-  尚未通过。生产规模 1/2/4 parser 对照进一步证明 1 parser 不能维持该档速率，2/4
-  parsers 均通过，4 parsers 提供更高 P95 service headroom。生产规模 Station→A、Power
-  与 coherency/Stokes 完整链已经通过；低错误率、
-  GPU-only 模块性能、阶段 P50/P95、利用率和额外 headroom 仍未完成。
-- `DumpToDada()` 仍是旧实现，不应用作 pipeline sink；性能 drain 使用
-  `dada_dbnull -s -z`，只有需要物化检查数据时才使用 `dada_dbdisk`。
+- [控制接口与生命周期](docs/control/lifecycle.md)
+- [文档索引](INDEX.md)
+- [构建与测试指南](tests/README.md)

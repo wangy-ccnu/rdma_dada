@@ -57,8 +57,3 @@ RESOLUTION=F*B*4*sizeof(float)
 `BYTES_PER_SECOND` 不变。Project Observation v1 的 `NPOL=2` 顺序固定为 `X,Y`；
 配置编译器写入 `POL_LABELS X,Y`，后续 stage 原样保留。输入和输出 buffer 不允许
 重叠，worker 必须分配独立输出区。
-
-生产验收使用 `A=469,F=2,P=2,B=350`、K128 MEAN、`STAGED_PIPELINE/3`。
-Full suite `full-30.2505Gbps-60s-20260829T075447Z` 已完成约 30 Gbps、60 秒、
-1 warm-up + 3 measured；四轮 sender→receiver→unpack→GPU→output→EOD 与 cleanup
-均闭合。GPU-only direct/1 与 staged/3 模块性能对照仍待执行。

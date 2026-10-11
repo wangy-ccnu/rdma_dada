@@ -19,17 +19,26 @@ void Expect(bool condition, const std::string& message) {
 
 }  // namespace
 
-int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::cerr << "usage: pipeline_config_test CONFIG\n";
-        return 2;
-    }
-
-    rdma_dada::PipelineConfig config;
+int main() {
+    // Internal geometry fixture; external runtime configuration is ResolvedPlan.
+    rdma_dada::PipelineConfig config = {};
+    config.nant = 4;
+    config.nchan = 1;
+    config.npol = 2;
+    config.payload_order = "TFP";
+    config.utc_start = "2026-08-01-00:00:00";
+    config.packet_header_bytes = 32;
+    config.packet_payload_bytes = 2048;
+    config.packet_samples = 512;
+    config.packet_nbit = 16;
+    config.sample_interval_us = 0.001;
+    config.records_per_block = 16384;
+    config.raw_ring_blocks = 8;
+    config.compute_ring_blocks = 8;
+    config.disk_enabled = true;
+    config.file_blocks = 10;
+    config.direct_io = true;
     std::string error;
-    Expect(rdma_dada::LoadPipelineConfig(argv[1], &config, &error),
-           "example config should load: " + error);
-    Expect(config.disk_enabled, "converted legacy config keeps disk sink enabled");
     Expect(config.payload_order == "TFP", "raw payload order is fixed to TFP");
 
     rdma_dada::PipelineLayout layout;
@@ -49,6 +58,9 @@ int main(int argc, char** argv) {
                "compute RESOLUTION is one TFPA time frame");
         Expect(layout.raw_block_bytes == UINT64_C(34078720), "raw block size");
         Expect(layout.compute_block_bytes == UINT64_C(33554432), "compute block size");
+        Expect(layout.raw_ring_bytes == UINT64_C(272629760) &&
+                   layout.compute_ring_bytes == UINT64_C(268435456),
+               "ring capacities include all eight blocks");
         Expect(layout.raw_file_bytes == UINT64_C(340787200),
                "raw file is FILE_BLOCKS raw blocks");
         Expect(layout.compute_file_bytes == UINT64_C(335544320),
@@ -115,6 +127,16 @@ int main(int argc, char** argv) {
     error.clear();
     Expect(!rdma_dada::ComputePipelineLayout(invalid, &layout, &error),
            "size arithmetic must reject overflow");
+
+    invalid = config;
+    invalid.raw_ring_blocks = std::numeric_limits<std::uint64_t>::max();
+    Expect(!rdma_dada::ComputePipelineLayout(invalid, &layout, &error),
+           "valid packet geometry still rejects ring capacity overflow");
+
+    invalid = config;
+    invalid.file_blocks = std::numeric_limits<std::uint64_t>::max();
+    Expect(!rdma_dada::ComputePipelineLayout(invalid, &layout, &error),
+           "valid packet geometry still rejects file capacity overflow");
 
     invalid = config;
     invalid.disk_enabled = false;

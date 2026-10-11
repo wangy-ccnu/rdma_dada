@@ -10,11 +10,10 @@ Reference implementations are available in the sibling `DSAbeamformer` and
 build dependencies.
 
 The first module set is `vdif_unpack`, `host_to_device`, `complex_convert`,
-`beamform`, `power`, `stokes`, `time_integrate`, and `device_to_host`, plus RDMA
-packetization adapters. Beamforming, Power, Stokes and time integration are
-separate modules. A configured worker may compose them in one process so
-intermediate values remain in GPU buffers, or place ring boundaries between
-them when process isolation is required.
+`beamform`, `power`, `stokes`, `time_integrate`, and `device_to_host`. Beamforming, Power, Stokes and time integration are
+separate modules. The Observation worker composes the supported GPU chain in
+one process so intermediate values remain in GPU buffers. Arbitrary ring
+boundaries between GPU algorithms are not a supported configuration option.
 
 `complex_convert` has portable and CUDA backends for signed little-endian
 CI8/CI16 to CF32 conversion with an explicit scale. `beamform` has a portable
@@ -22,32 +21,22 @@ FP32 reference implementation, strict NPY weight loader and an asynchronous
 CUDA FP32/TF32 backend. `power`, `stokes` and `time_integrate` have portable
 FP32 reference implementations and asynchronous CUDA elementwise/reduction
 backends. `host_to_device` and `device_to_host` are byte-preserving asynchronous
-CUDA transfer modules and are used by `pipeline_worker`. Their standalone CUDA
-correctness tests have passed on the target server. The GPU worker now runs
+CUDA transfer modules and are used by `pipeline_worker`. The GPU worker runs
 H2D→ATFP transpose/conversion→Beamform→Power/Stokes→optional TimeIntegrate→D2H.
-Beamform-only, Power and Stokes numerical products plus the Resolved
-Plan/PSRDADA/CUDA ring integration have passed server acceptance. Production
-A=469 Full Power and coherency-product pipelines have also passed the nominal
-30 Gb/s, 60 s, warm-up plus three-measured-run campaign with count closure,
-EOD and cleanup. The coherency output contract is
+The coherency output contract is
 `AA,BB,AB_REAL,AB_IMAG`; I/Q/U/V are reference-derived validation quantities,
-not separately published arrays. Isolated GPU saturation/headroom and a strict
-same-build direct/1 versus staged/3 performance ablation remain outstanding;
-isolated correctness alone does not establish those limits. Future algorithms
-should use the worker-owned execution stream by default.
+not separately published arrays. Modules use the execution stream supplied by
+the worker.
 
 The authoritative data layouts, module inputs/outputs, integration rules and
 worker invocation contract are documented in
 [`doc/ALGORITHM_MODULE_CONTRACTS.md`](../doc/ALGORITHM_MODULE_CONTRACTS.md).
-The current direct-receive and parallel-unpack architecture, test boundary and
-performance evidence are summarized in
-[`docs/VDIF_UNPACK_STATUS.md`](../docs/VDIF_UNPACK_STATUS.md).
+The per-instance ring boundaries are documented in
+[`doc/PIPELINE_ARCHITECTURE.md`](../doc/PIPELINE_ARCHITECTURE.md).
 
 Module order is configuration-driven and compatibility-checked. Each module
 must declare/validate its accepted input header and publish its output datatype,
 dimensions, ordering, memory location and block geometry.
 
-The current worker still selects from fixed legal chains. A general module
-registry for constructing arbitrary compatible chains is planned but not yet
-implemented. Per-module and application status is tracked in
+The current worker selects from fixed legal chains. Current feature status is tracked in
 [`docs/PROJECT_STATUS.md`](../docs/PROJECT_STATUS.md).

@@ -66,9 +66,6 @@ struct WorkerBlockGeometry {
     std::uint64_t scratch_block_bytes;
 };
 
-bool LoadWorkerConfig(const std::string& path, WorkerConfig* config,
-                      std::string* error);
-
 // Builds the worker runtime contract from the single resolved observation
 // plan. No geometry or NBEAM is independently entered by the worker.
 bool BuildWorkerConfigFromResolvedPlan(

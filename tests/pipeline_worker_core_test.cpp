@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <string>
 
 namespace {
@@ -27,12 +28,6 @@ void ExpectNear(float actual, float expected, const std::string& message) {
                   << ", got " << actual << '\n';
         ++failures;
     }
-}
-
-bool EndsWith(const std::string& value, const std::string& suffix) {
-    return value.size() >= suffix.size() &&
-           value.compare(value.size() - suffix.size(), suffix.size(), suffix) ==
-               0;
 }
 
 bool WriteWeights(const std::string& path) {
@@ -56,30 +51,6 @@ bool WriteWeights(const std::string& path) {
     output.write(reinterpret_cast<const char*>(prefix), sizeof(prefix));
     output.write(header.data(), static_cast<std::streamsize>(header.size()));
     output.write(reinterpret_cast<const char*>(weights), sizeof(weights));
-    return output.good();
-}
-
-bool WriteLegacyWorkerConfig(const std::string& path,
-                             const std::string& weights_path) {
-    std::ofstream output(path.c_str(), std::ios::trunc);
-    if (!output) return false;
-    output
-        << "{\n"
-        << "  \"schema_version\": 1,\n"
-        << "  \"rings\": {\"input_key\": \"dada\", "
-           "\"output_key\": \"dadb\"},\n"
-        << "  \"execution\": {\"backend\": \"CPU_REFERENCE\", "
-           "\"cuda_device\": 0, \"run_once\": true},\n"
-        << "  \"input_geometry\": {\"nchan\": 1, \"nant\": 2, "
-           "\"npol\": 2, \"udp_payload_bytes\": 4, "
-           "\"samples_per_udp\": 1, "
-           "\"udp_packets_per_antenna_per_block\": 1},\n"
-        << "  \"beamform\": {\"weights_file\": \"" << weights_path
-        << "\", \"weights_order\": \"FPAB2\", "
-           "\"weights_id\": \"legacy-v1\", \"weights_scale\": 1.0, "
-           "\"nbeam\": 1, \"compute_mode\": \"FP32\"},\n"
-        << "  \"output\": {\"product\": \"POWER\"}\n"
-        << "}\n";
     return output.good();
 }
 
@@ -133,26 +104,20 @@ rdma_dada::pipeline::WorkerConfig MakeConfig(const std::string& weights_path) {
     return config;
 }
 
-void TestConfigAndAsciiCodec(const std::string& config_path) {
-    rdma_dada::pipeline::WorkerConfig config;
+void TestGeometryAndAsciiCodec(const std::string& weights_path) {
+    // Internal fixture keeps large-block geometry coverage without a loader.
+    rdma_dada::pipeline::WorkerConfig config = MakeConfig(weights_path);
+    config.nant = 4;
+    config.udp_payload_bytes = 2048;
+    config.samples_per_udp = 512;
+    config.udp_packets_per_antenna_per_block = 4096;
+    config.conversion_scale = 0.0078125;
+    config.nbeam = 2;
+    config.product = rdma_dada::pipeline::WorkerProduct::kPower;
+    config.integration_enabled = true;
+    config.integration_length = 128;
+    config.integration_operation = "MEAN";
     std::string error;
-    Expect(rdma_dada::pipeline::LoadWorkerConfig(
-               config_path, &config, &error),
-           "example worker JSON loads: " + error);
-    Expect(config.input_key == 0xdada && config.output_key == 0xdadb,
-           "hexadecimal ring keys are parsed");
-    Expect(config.execution_backend == "CPU_REFERENCE" && config.run_once,
-           "execution settings are parsed");
-    Expect(std::fabs(config.conversion_scale - 0.0078125) < 1.0e-12,
-           "mandatory integer-to-CF32 conversion scale is parsed");
-    Expect(config.product == rdma_dada::pipeline::WorkerProduct::kPower,
-           "output product is parsed");
-    Expect(config.integration_enabled && config.integration_length == 128 &&
-               config.integration_operation == "MEAN",
-           "time integration settings are parsed from schema v2");
-    Expect(EndsWith(config.weights_file,
-                    "config/weights/beamform_weights.npy"),
-           "relative weight path is resolved from the JSON directory");
     rdma_dada::pipeline::WorkerBlockGeometry geometry;
     Expect(rdma_dada::pipeline::ComputeWorkerBlockGeometry(
                config, &geometry, &error),
@@ -175,6 +140,13 @@ void TestConfigAndAsciiCodec(const std::string& config_path) {
            "integration shortens T and final output block by K");
     Expect(geometry.scratch_block_bytes == UINT64_C(100663296),
            "integrated power chain scratch holds beamformed and product blocks");
+
+    rdma_dada::pipeline::WorkerConfig overflow = config;
+    overflow.udp_packets_per_antenna_per_block =
+        std::numeric_limits<std::uint64_t>::max();
+    Expect(!rdma_dada::pipeline::ComputeWorkerBlockGeometry(
+               overflow, &geometry, &error),
+           "worker time geometry rejects multiplication overflow");
 
     const char input[] =
         "HDR_SIZE 4096\n"
@@ -203,18 +175,6 @@ void TestConfigAndAsciiCodec(const std::string& config_path) {
     Expect(!rdma_dada::pipeline::ParseAsciiMetadata(
                duplicate, sizeof(duplicate), &roundtrip, &error),
            "duplicate header fields are rejected");
-}
-
-void TestLegacyConfigDefaults(const std::string& config_path) {
-    rdma_dada::pipeline::WorkerConfig config;
-    std::string error;
-    Expect(rdma_dada::pipeline::LoadWorkerConfig(
-               config_path, &config, &error),
-           "schema v1 worker JSON remains readable: " + error);
-    Expect(!config.integration_enabled && config.integration_length == 1 &&
-               config.integration_operation == "MEAN" &&
-               std::fabs(config.conversion_scale - 1.0) < 1.0e-12,
-           "schema v1 keeps legacy integration and conversion defaults");
 }
 
 void TestModuleChain(const std::string& weights_path) {
@@ -442,6 +402,14 @@ void TestIntegratedModuleChain(const std::string& weights_path) {
     Expect(output.sequence == 121,
            "integrated chain preserves block sequence");
 
+    status = chain.PlanBlock(3 * 32, &scratch_bytes, &output_bytes);
+    Expect(!status.ok(),
+           "partial EOD block with T not divisible by K is rejected");
+    status = chain.Finish();
+    Expect(status.ok(), "integrated chain finishes a complete transfer");
+    status = chain.PlanBlock(sizeof(input_data), &scratch_bytes, &output_bytes);
+    Expect(!status.ok(), "finished chain cannot process another block before configuration");
+
     rdma_dada::pipeline::WorkerConfig invalid_config = config;
     invalid_config.udp_packets_per_antenna_per_block = 3;
     rdma_dada::pipeline::WorkerBlockGeometry invalid_geometry;
@@ -528,27 +496,19 @@ void TestIntegratedStokesChain(const std::string& weights_path) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 3) {
-        std::cerr << "usage: pipeline_worker_core_test CONFIG WEIGHTS_PATH\n";
+    if (argc != 2) {
+        std::cerr << "usage: pipeline_worker_core_test WEIGHTS_PATH\n";
         return 2;
     }
-    TestConfigAndAsciiCodec(argv[1]);
-    if (!WriteWeights(argv[2])) {
+    TestGeometryAndAsciiCodec(argv[1]);
+    if (!WriteWeights(argv[1])) {
         std::cerr << "failed to create worker test NPY file\n";
         return 2;
     }
-    const std::string legacy_config_path = std::string(argv[2]) + ".json";
-    if (!WriteLegacyWorkerConfig(legacy_config_path, argv[2])) {
-        std::cerr << "failed to create schema v1 worker config\n";
-        std::remove(argv[2]);
-        return 2;
-    }
-    TestLegacyConfigDefaults(legacy_config_path);
-    TestModuleChain(argv[2]);
-    TestIntegratedModuleChain(argv[2]);
-    TestIntegratedStokesChain(argv[2]);
-    std::remove(legacy_config_path.c_str());
-    std::remove(argv[2]);
+    TestModuleChain(argv[1]);
+    TestIntegratedModuleChain(argv[1]);
+    TestIntegratedStokesChain(argv[1]);
+    std::remove(argv[1]);
     if (failures != 0) return 1;
     std::cout << "pipeline_worker_core_test passed\n";
     return 0;

@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "task": "MS-07a coordinator evidence audit",
+  "date": "2026-10-11",
+  "coordinator_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "executor_thread_id": "019fbb68-ae6f-77f0-bfdd-30bc30bd6c45",
+  "original_evidence": "ms07a-acceptance-20261011.json",
+  "source_manifest_sha256": "3ed01d0f76a147f75b41d7f86c7a2c5ee91b30de0c389353e44d5afd4e31824b",
+  "purpose": "Preserve original evidence and correct total executed repetition accounting and notification-only hash transition. No rerun or source change.",
+  "original_required_acceptance": {
+    "rounds_per_test": 3,
+    "case_executions": 306,
+    "result": "PASS"
+  },
+  "all_observed_registered_runs": [
+    {
+      "tool_call_id": "exec-989492d4-e69b-435f-a5a0-e8704a342f57",
+      "tests": [
+        "store",
+        "controller",
+        "transport"
+      ],
+      "rounds_each": 3,
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "tool_call_id": "exec-466923a1-862b-4205-aad5-b633226568ba",
+      "tests": [
+        "controller",
+        "transport"
+      ],
+      "rounds_each": 3,
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "tool_call_id": "exec-f4234740-d0fa-4344-b5b6-99af5b5eed26",
+      "tests": [
+        "controller"
+      ],
+      "rounds_each": 3,
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "tool_call_id": "exec-a3cf96fb-0520-44d6-b36d-9fe11c5c4c3f",
+      "tests": [
+        "transport"
+      ],
+      "rounds_each": 3,
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "tool_call_id": "exec-f6171f8c-ac14-45fb-95d9-8bf44f0d1151",
+      "tests": [
+        "store"
+      ],
+      "rounds_each": 3,
+      "exit_code": 0,
+      "result": "PASS"
+    }
+  ],
+  "actual_totals": {
+    "store": {
+      "cases": 28,
+      "rounds": 6
+    },
+    "controller": {
+      "cases": 52,
+      "rounds": 9
+    },
+    "transport": {
+      "cases": 22,
+      "rounds": 9
+    },
+    "registered_rounds": 24,
+    "case_executions": 834,
+    "failed_rounds": 0
+  },
+  "json_probe": {
+    "rounds": 3,
+    "roundtrip": "PASS",
+    "deterministic_exit7": "PASS",
+    "exit_codes": [
+      0,
+      0,
+      0
+    ]
+  },
+  "setup_harness_corrections": [
+    "Initial manifest relative-path check ran outside mirror root; rooted env -C verification then passed 328/328 on both hosts.",
+    "Nested-shell combined CTest regex was rejected; literal single-test argv then passed. Neither is a product/test failure."
+  ],
+  "evidence_hash_transition": {
+    "reported_pre_notification_sha256": "57484c799a56ec3016e85590f0b12ee331cc5dafd58ed7001559cd54bc916478",
+    "local_delivered_sha256": "5ed4d00e7632072e0e42a55e04fa0e042af688b92084349bfba5c3a8c9021da1",
+    "verified_difference": "Changing only RESULT_NOTIFICATION from PASS to PENDING in the local bytes reproduces the reported pre-notification SHA256.",
+    "remote_final_equality": "Not re-queried; do not claim final local bytes equal the remote pre-notification copy."
+  },
+  "independent_review": {
+    "spec": "PASS",
+    "standards": "PASS_AFTER_TIMEOUT_RANGE_FIX",
+    "transport_local_cases": 22,
+    "python38_grammar": "PASS"
+  },
+  "decision": "ACCEPTED_TRANSPORT_ONLY",
+  "TEST_RESULT": "PASS",
+  "CLEANUP_RESULT": "PASS",
+  "DATAFLOW": "NOT_RUN",
+  "limitations": [
+    "No production host entrypoint/supervisor, process ownership or disconnect-survival acceptance.",
+    "No RDMA/unpack/GPU/observation startup or live telemetry.",
+    "Additional repeats were redundant, not required acceptance; all are retained, none selected or omitted."
+  ]
+}

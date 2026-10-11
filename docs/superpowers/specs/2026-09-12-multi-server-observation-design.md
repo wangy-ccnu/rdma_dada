@@ -75,51 +75,13 @@
 
 频段分配必须覆盖本次选定频道集合且不重叠，并校验本次采用的均分/余数规则。每包采样数 S 保持一致；频道多一个时调整包字节数，不自动修改 S。内存不足、包长不合法、权重不匹配时拒绝生成，不自动减小某台 T 或调整频道归属。
 
-## 4. 全局配置概念样例
+## 4. 公共时间网格示例
 
-以下是拟议接口样例，不是当前 schema 可执行文件。资源名称均为示例引用；生成工具尚未实现。四 Station 小几何仅便于检查算术，不替代 469 Station 生产验收。
+可执行的输入 schema、示例与生成命令统一见[配置指南](../../control/configuration.md)，
+本设计不另存一份拟议 JSON 接口。
 
-```json
-{
-  "schema_version": 1,
-  "observation": {
-    "observation_id": "multi-server-layout-example",
-    "utc_start": "2026-09-12-00:00:00",
-    "duration_seconds": "1.048576",
-    "station_ids": [1000, 1001, 1002, 1003],
-    "npol": 1,
-    "sample_interval_ps": 1000000
-  },
-  "channels": {
-    "first_channel_id": 100,
-    "nchan": 7,
-    "first_center_frequency_hz": 1200000000,
-    "channel_spacing_hz": 1000000
-  },
-  "wire": {
-    "profile": "packet_formats/frontend.example-v1.json",
-    "samples_per_packet": 512
-  },
-  "time_grid": {"samples_per_block": 16384},
-  "processing": {
-    "weights_resource": "example-global-weights-f7-p1-a4-b2",
-    "conversion_scale": "0.0078125",
-    "product": "POWER",
-    "integration": {"length": 128, "operation": "MEAN"}
-  },
-  "assignments": [
-    {"server_id": "node-a", "gpu_id": 0, "first_channel_id": 100, "nchan": 4, "deployment_profile": "example-node-a-gpu0"},
-    {"server_id": "node-b", "gpu_id": 0, "first_channel_id": 104, "nchan": 3, "deployment_profile": "example-node-b-gpu0"}
-  ],
-  "monitoring": {
-    "report_interval_ms": 1000,
-    "rate_window_ms": 5000,
-    "heartbeat_timeout_ms": 5000
-  }
-}
-```
-
-监测周期数值是讨论样例，不是已验收默认值。完整部署 profile 与权重资源需要由用户提供；引用的内容和 SHA 随生成产物记录，不凭示例名字推断硬件配置。
+以 A=4、P=1、B=2、F=7 按 4/3 频道分配为例，每包 512 samples，
+每 block 16,384 samples，采样间隔 1 μs，K=128。此小几何仅说明分配算术。
 
 样例派生值：
 

@@ -1,0 +1,82 @@
+{
+  "task": "MS-07 P3 read-only Phase 0",
+  "coordinator_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "executor_thread_id": "019fbb68-ae6f-77f0-bfdd-30bc30bd6c45",
+  "source_worktree": "/Users/ywang/WorkFile/code/rdma_dada/.worktrees/multi-server-observation",
+  "branch": "codex/multi-server-observation",
+  "head": "78b909e854b5de142c0072a6acb0a4b85a54e0fa",
+  "scope": "HF control host and qths1 processing host only; read-only; no sync/build/CTest/rings/capability/dataflow",
+  "phase0": {
+    "connectivity": {
+      "local_to_hf": {"argv": ["ssh", "HF", "/bin/hostname"], "host": "qtrelay0", "status": "PASS"},
+      "local_direct_qths1": {"argv": ["ssh", "qths1", "/bin/hostname"], "status": "UNAVAILABLE", "detail": "local SSH config cannot resolve qths1; required topology is HF to qths1"},
+      "hf_to_qths1": {"argv": ["ssh", "HF", "--", "ssh", "qths1", "--", "/bin/hostname"], "host": "qths1", "status": "PASS"},
+      "hf_ssh": {"version": "OpenSSH_8.2p1 Ubuntu-4ubuntu0.13", "known_host_entry": "qths1 present", "host_key_algorithm": "ecdsa-sha2-nistp256", "status": "PASS"},
+      "json_argv_transfer": {"status": "UNPROVEN", "detail": "fixed argv transport works; no mutating JSON/control probe was run"}
+    },
+    "runtime": {
+      "hf_python": "Python 3.8.10",
+      "qths_python": "Python 3.8.10",
+      "cmake": "/home/user/wy/tools/cmake-3.31.12/bin/cmake 3.31.12",
+      "ctest": "/home/user/wy/tools/cmake-3.31.12/bin/ctest 3.31.12",
+      "cuda_nvcc": "/usr/local/cuda-12.8/bin/nvcc 12.8.93",
+      "psrdada_prefix": "/home/user/psrdada",
+      "rdma_tools": {"ibv_devinfo": "/usr/bin/ibv_devinfo", "rdma": "/usr/bin/rdma", "ip": "/usr/sbin/ip"},
+      "systemd_user": {"qths_state": "running", "linger": "no", "systemd_run_user_supported": true},
+      "setsid": "/usr/bin/setsid",
+      "nohup": "/usr/bin/nohup",
+      "disconnect_survival": "UNKNOWN; no probe was started and Linger=no does not establish persistence"
+    },
+    "feature_namespace": {
+      "hf_source": {"path": "/home/user/wy/rdma_dada-multiserver", "owner": "user:user", "mode": "drwxr-xr-x", "writable": true},
+      "qths_source": {"path": "/home/user/wy/rdma_dada-multiserver", "owner": "user:user", "mode": "drwxr-xr-x", "writable": true},
+      "hf_runtime_root": {"path": "/home/user/wy/multiserver-runs", "status": "ABSENT", "created": false},
+      "qths_runtime_root": {"path": "/home/user/wy/multiserver-runs", "status": "ABSENT", "created": false},
+      "hf_result_root": {"path": "/home/user/wy/task8c-multiserver-results", "owner": "user:user", "mode": "drwxrwxr-x", "writable": true},
+      "qths_result_root": {"path": "/home/user/wy/task8c-multiserver-results", "owner": "user:user", "mode": "drwxrwxr-x", "writable": true}
+    },
+    "hosting_and_readiness": {
+      "feature_host_agent": "ABSENT; scripts/multiserver_host.py, host_agent.py, transport.py, ownership.py not present",
+      "existing_feature_scripts": ["scripts/multiserver_compile.py"],
+      "readiness_interface": "UNKNOWN; no versioned host supervisor or readiness protocol exists",
+      "normal_end_signal_interface": "UNKNOWN; no host supervisor contract is implemented",
+      "process_identity": "user-owned processes expose PID/PPID/PGID/SID via ps; current user has no CAP_KILL, own-UID signal scope is available",
+      "probe_policy": "no sleep/PID/disconnect probe started"
+    },
+    "hardware": {
+      "gpus": "2x NVIDIA GeForce RTX 3090, PCI 0000:3B:00.0 and 0000:5E:00.0, driver 570.133.07, 24 GiB each",
+      "gpu_numa": "nvidia-smi topo reports GPU NUMA ID 0; both GPU PCI sysfs numa_node=0",
+      "cpu_numa": "NUMA0 CPUs 0-11,24-35; NUMA1 CPUs 12-23,36-47; free memory ~61.5/61.4 GiB",
+      "nic": "mlx5_0 / ens2np0, PCI 0000:d8:00.0, NUMA1, Ethernet port active, 40,000 Mb/s full duplex, MTU 4096, link UP",
+      "clock": {"hf_ntp": "noted as synchronized", "qths_ntp": "NTPSynchronized=yes", "qths_timezone": "Asia/Shanghai"},
+      "disk": "qths /home/user/wy filesystem ~795 GB free",
+      "cuda_env": {"CUDA_DEVICE_MAX_CONNECTIONS": "UNSET", "CUDA_LAUNCH_BLOCKING": "UNSET"}
+    },
+    "residue": {
+      "qths_task_processes": "none found for rdma2dada, vdif_unpack_worker, pipeline_worker, dada_db, fpga_sender_sim",
+      "qths_gpu_compute_apps": "empty",
+      "qths_sysv_ipc": "only pre-existing gdm-owned shmid 2 and 5; no user task rings; semaphore table empty",
+      "hf_task_processes": "none found",
+      "status": "PASS for no task-owned residue; foreign gdm IPC untouched"
+    },
+    "historical_binaries": {
+      "pipeline_worker": {"path": "/home/user/wy/build-coherency-20260829-r2/pipeline_worker", "sha256": "a3c777820f0b1aabd623c27d1b48870fbe284b61d1423b0ade6d7099d3e78fc3"},
+      "rdma2dada": {"path": "/home/user/wy/build-coherency-20260829-r2/rdma2dada", "sha256": "1bcc6f4b1441a3a589be7ee9e9f366eb5960472b50ead9875547a5a94b8e12d8"},
+      "vdif_unpack_worker": {"path": "/home/user/wy/build-coherency-20260829-r2/vdif_unpack_worker", "sha256": "d2d6faacc5efff9767d858562937d7f175dac6c6435df12e56bc8ae88bb2e823"},
+      "dada_dbnull": {"path": "/home/user/psrdada/bin/dada_dbnull", "sha256": "fbe083b4fdc775e0b3e4513c1c150a1e73e7475164beef83487823b8ba13bcbc"},
+      "dependency_status": "PSRDADA and CUDA/RDMA libraries resolve for selected historical binaries; one attempted vdif_unpack_worker path build-coherency-20260905 was absent"
+    },
+    "command_issues": [
+      {"argv": "stat -c %n|%U:%G|%A|%s ...", "status": "HARNESS_QUOTING", "detail": "remote shell interpreted |; repeated as independent stat argv without metacharacters"},
+      {"argv": "chronyc tracking", "status": "UNAVAILABLE", "detail": "chronyc not installed; timedatectl reports NTPSynchronized=yes"},
+      {"argv": "qths /home/user/psrdada/bin/rdma2dada --help", "status": "ABSENT_PATH", "detail": "rdma2dada and pipeline_worker are build outputs, not PSRDADA binaries"}
+    ]
+  },
+  "TEST_RESULT": "DIAGNOSTIC_COMPLETE",
+  "PHASE0": "PASS_WITH_UNKNOWN_FACILITIES",
+  "CLEANUP_RESULT": "NOT_APPLICABLE",
+  "DATAFLOW": "NOT_RUN",
+  "SYNC_BUILD_CTEST": "NOT_RUN",
+  "next_gate": "P3 host supervisor/transport implementation and a controlled disconnect/readiness probe are required before live-host acceptance; do not infer survival from systemd-run/setsid/nohup availability",
+  "RESULT_NOTIFICATION": "PASS"
+}

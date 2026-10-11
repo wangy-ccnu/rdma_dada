@@ -52,5 +52,5 @@ finalize partial range，等待所有 writer ACK，再发布 compute EOD 并 joi
 `true` 用于有限功能或验收测试。当前第一版 worker 接受 `PKT_NBIT=16` 对应的 CI8
 （8-bit 实部 + 8-bit 虚部）；CI16 codec 已存在，但尚未开放为 worker 输入模式。
 
-当前架构、性能证据和正式验收缺口见
-[`../../docs/VDIF_UNPACK_STATUS.md`](../../docs/VDIF_UNPACK_STATUS.md)。
+实例内架构见[数据面架构](../../doc/PIPELINE_ARCHITECTURE.md)；
+多服务器接入和验收边界见[项目状态](../../docs/PROJECT_STATUS.md)。

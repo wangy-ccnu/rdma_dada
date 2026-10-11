@@ -1,0 +1,56 @@
+{
+  "task": "Observation unique configuration entry cleanup Phase 0",
+  "coordinator_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "source_worktree": "/Users/ywang/WorkFile/code/rdma_dada/.worktrees/multi-server-observation",
+  "base_head": "78b909e854b5de142c0072a6acb0a4b85a54e0fa",
+  "scope": "HF control to qths1 processing only; read-only; no sync/build/CTest/Git/rings/GPU/network dataflow",
+  "connectivity": {"hf_to_qths1": "PASS", "qtp": "NOT_IN_SCOPE", "paper_canonical_touched": false},
+  "toolchain": {
+    "cmake": "/home/user/wy/tools/cmake-3.31.12/bin/cmake 3.31.12 rc=0",
+    "ctest": "/home/user/wy/tools/cmake-3.31.12/bin/ctest 3.31.12 rc=0",
+    "python": "/usr/bin/python3 3.8.10 rc=0",
+    "gcc": "/usr/bin/gcc 9.4.0 rc=0",
+    "gxx": "/usr/bin/g++ 9.4.0 rc=0",
+    "nvcc": "/usr/local/cuda-12.8/bin/nvcc 12.8.93 rc=0",
+    "cuda": "2x RTX3090, driver 570.133.07, 24GiB each"
+  },
+  "psrdada_rdma": {
+    "pkg_config_without_path": "rc=1; package not found",
+    "pkg_config_path": "/home/user/psrdada/bin:/home/user/psrdada/lib/pkgconfig",
+    "pkg_version": "1.3.0 rc=0",
+    "pkg_cflags": "-I/home/user/psrdada/include rc=0",
+    "pkg_libs": "-L/usr/local/cuda/lib64 -L/home/user/psrdada/lib -lcudart -lhwloc -lpsrdada rc=0",
+    "psrdada_pc": "/home/user/psrdada/bin/psrdada.pc user:user",
+    "ibv_devinfo": "/usr/bin/ibv_devinfo; mlx5_0 active Ethernet, MTU4096, firmware16.35.4506 rc=0",
+    "rdma": "/usr/bin/rdma"
+  },
+  "linking": {
+    "pipeline_worker": ["libcudart.so.12=/usr/local/cuda-12.8/targets/x86_64-linux/lib", "libcublas.so.12=/usr/local/cuda-12.8/targets/x86_64-linux/lib", "libpsrdada.so.1=/home/user/psrdada/lib"],
+    "rdma2dada": ["libibverbs.so.1=/lib/x86_64-linux-gnu", "libpsrdada.so.1=/home/user/psrdada/lib", "libcudart.so.12=/usr/local/cuda/lib64"],
+    "dada_dbnull": ["libpsrdada.so.1=/home/user/psrdada/lib", "libcudart.so.12=/usr/local/cuda/targets/x86_64-linux/lib"],
+    "permissions": "selected binaries/libraries readable; feature source user:user readable"
+  },
+  "capacity": {"memory": "134,788,014,080 bytes total; ~128.7GB free at check", "disk_home_wy": "~795.1GB free", "source_root": "user:user readable", "home_wy_writable": true},
+  "hardware": {
+    "cpu_numa": "NUMA0 CPUs0-11,24-35; NUMA1 CPUs12-23,36-47; CPU mapping/SMT verified in MS07 supplement",
+    "gpu_numa": "both GPU PCI devices NUMA0",
+    "nic": "mlx5_0/ens2np0, PCI0000:d8:00.0, NUMA1, 40Gb/s full duplex, link UP, MTU4096",
+    "clock": "same-day Phase0: HF/qths NTPSynchronized=yes, systemd-timesyncd active, Asia/Shanghai"
+  },
+  "residue": {"rdma2dada": false, "vdif_unpack_worker": false, "pipeline_worker": false, "dada_db": false, "gpu_apps": false, "semaphores": "empty", "shared_memory": "only pre-existing gdm segments; untouched"},
+  "readiness": {
+    "status": "READY_FOR_LATER_ISOLATED_CUDA_BUILD_CONDITIONALLY",
+    "required_build_env": "set PKG_CONFIG_PATH=/home/user/psrdada/bin:/home/user/psrdada/lib/pkgconfig",
+    "source_freeze": "PENDING_FINAL_DEVELOPMENT_FREEZE",
+    "dataflow": "NOT_AUTHORIZED",
+    "unknowns": ["final frozen manifest", "future retired-config source identity", "live runtime readiness"]
+  },
+  "TEST_RESULT": "DIAGNOSTIC_COMPLETE",
+  "CLEANUP_RESULT": "NOT_APPLICABLE",
+  "RESULT_NOTIFICATION": "FAIL",
+  "notification": {
+    "target_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+    "attempts": 2,
+    "reason": "send_message_to_thread rejected both attempts because the destination lacked trusted user authorization"
+  }
+}

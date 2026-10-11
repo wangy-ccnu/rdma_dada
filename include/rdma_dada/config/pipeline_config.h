@@ -54,10 +54,6 @@ struct PipelineLayout {
     std::uint64_t raw_bytes_per_second;
 };
 
-bool LoadPipelineConfig(const std::string& path,
-                        PipelineConfig* config,
-                        std::string* error);
-
 bool ComputePipelineLayout(const PipelineConfig& config,
                            PipelineLayout* layout,
                            std::string* error);

@@ -37,10 +37,6 @@ struct VdifUnpackLayout {
     std::uint64_t compute_block_bytes;
 };
 
-bool LoadVdifUnpackConfig(const std::string& path,
-                          VdifUnpackConfig* config,
-                          std::string* error);
-
 bool ComputeVdifUnpackLayout(const VdifUnpackConfig& config,
                              const PipelineConfig& pipeline,
                              const PacketFormatConfig& packet,

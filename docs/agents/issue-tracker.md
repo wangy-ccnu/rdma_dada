@@ -5,8 +5,11 @@ operations.
 
 ## Repository
 
-- GitHub repository: `hyysky/rdma_dada`
-- Remote: `git@github.com:hyysky/rdma_dada.git`
+- GitHub repository: `wangy-ccnu/rdma_dada`
+- Remote: `git@github.com:wangy-ccnu/rdma_dada.git`
+- Multi-server changes target `codex/multi-server-observation`; paper/ablation
+  branches retain their scope. Confirm checkout and remote before publishing.
+  Documentation maintenance does not authorize issue or PR creation.
 
 ## Conventions
 

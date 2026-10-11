@@ -11,10 +11,9 @@ output header 与编译器生成的最终 header 完全比对，然后逐个 dat
 模块生命周期。
 
 可选参数 `--metrics-json PATH` 在 transfer 结束时原子写入结构化指标，包括处理 block
-数、输入/输出 bytes、每 block 总 service time、output-ring wait，以及同一 CUDA stream
-上的 H2D、算法链、D2H 累计时间。该参数不增加第二条 stream，也不引入已有逐 block
-同步之外的额外同步；测试控制器用这些字段核对每个 compute block 都产生一个 output
-block。旧的一参数调用保持兼容。
+数、输入/输出 bytes、每 block service time、output-ring wait，以及 H2D、算法链、D2H
+累计时间。stream 拓扑由 `processing.cuda_pipeline` 决定，不由 metrics 开关决定。
+计数用于核对 compute/output block 闭合，阶段累计时间可能重叠，不能直接求和作为墙钟时间。
 
 固定前缀为 `H2D -> ComplexConvert`：输入 ring 的块级 `ATFP/CI8` 先在 GPU 上融合
 完成物理转置、CI8→CF32 和 scale，得到独立的 `TFPA/CF32` buffer，再进入以下算法链。
@@ -121,7 +120,7 @@ ring 的 EOD。这样当有限观测恰好结束于完整 block 边界时，不�
 - `SYNCHRONOUS_DIRECT`：单 stream 基线，`inflight_blocks` 必须为 1；输入
   ring 直接 H2D，D2H 直接写 output ring。
 - `STAGED_PIPELINE`：1–4 个有界 slot，每个 slot 独占 non-blocking CUDA
-  stream、pinned output staging 和 device 中间 buffer；worker 在 transfer 生命周期
+  compute stream、pinned output staging 和 device 中间 buffer，并共用独立 H2D stream；worker 在 transfer 生命周期
   用 `dada_cuda_dbregister` 注册 compute ring，H2D 直接读取 ring block；reader 按 block
   序号提交，单 writer 严格按序写 output ring，因此 CUDA 完成乱序不会造成
   ring block 乱序。
@@ -135,8 +134,7 @@ metrics JSON；兼容字段 `input_staging_bytes` 在直注册路径必须为 0�
 Stokes 及其积分输出自动为 `F32`。output ring 的 block 数复用 compute ring block 数，
 block bytes 由权重 B 维、所选产品和积分长度自动计算。
 
-[`config/pipeline_worker.example.json`](../../config/pipeline_worker.example.json)
-仅保留给模块级兼容测试，不再是 `pipeline_worker` 应用入口。
+worker 仅消费由 Observation 编译生成的 Resolved Plan；模块级测试通过内部 fixture 初始化 runtime structs。
 
 `udp_packets_per_antenna_per_block` 表示每个阵元贡献的 UDP 包数，不是所有阵元合计
 包数；所有阵元合计包数为 `A×udp_packets_per_antenna_per_block`。
@@ -194,68 +192,29 @@ compute 与 output 两个 ring。`run_once=true`
 时完成一个 input transfer/EOD 后退出；为 `false` 时重新获取 input read lock，等待下一次
 transfer。`SIGINT`/`SIGTERM` 会请求在当前 PSRDADA 操作返回后停止。
 
-## CUDA 第一版限制
+## CUDA 调度与所有权
 
-- 每个 transfer 创建一条 worker-owned non-blocking stream。
-- 独立的 ATFP integer input、converted TFPA、module scratch 和 final output device
-  buffer 不允许 alias。`HostToDeviceModule`、转换/算法 kernel 和
-  `DeviceToHostModule` 都提交到同一 stream；两个传输模块不申请 buffer，也不自行同步。
-- `SYNCHRONOUS_DIRECT/1` 在提交 output ring block、释放 input block 前执行
-  `cudaStreamSynchronize()`，保留为未优化对照路径。
-- `STAGED_PIPELINE/N` 在 transfer 开始时注册整个 compute ring；每个 slot 使用独立
-  non-blocking stream、device buffers、pinned output 和完成事件。H2D 直接读取当前
-  compute-ring block，输入 lease 保留到该 slot 的 H2D 完成；单一 writer 等待下一
-  sequence 的完成事件，再复制并提交 output ring block，因此跨 block overlap 不改变
-  header、block 或有序发布契约。
+- direct/1 使用单 stream，处理完成后再提交 output 并释放 input。
+- staged/N 共用一条 non-blocking H2D stream，每 slot 有独立 compute stream；
+  对应 compute 等待该 block 的 H2D event，D2H 跟随其 compute。
+- N≥2 使用 `ONE_BLOCK_H2D_LOOKAHEAD`：先排入下一 block H2D，再提交前一 block
+  compute/D2H；N=1 使用单 slot 顺序策略。输入 lease 只在本 block H2D 完成后释放。
+- 每个 slot 独占 device buffers、pinned output 和事件。单 writer 按 sequence 等待
+  完成并复制到 output ring；slot 不因 CUDA 乱序完成而提前复用。
+- Drain 提交最后一个待计算 block，完成在途任务后发布 EOD；Abort 同样必须等待
+  所有仍引用 buffer/event 的 stream 结束，才能销毁资源。
 
 ## GPU block deadline 与容量预检
 
-编译 Observation 时会把 `gpu_pipeline_budget` 写入 `validation_report.json`。普通观测使用
-Observation 自身推导的 payload 速率；吞吐测试必须显式传入目标速率，例如：
+实例 Observation 编译时生成 `validation_report.json.gpu_pipeline_budget`，
+记录各阶段 block bytes、到达间隔、service deadline、device/pinned 内存及建议空闲显存。
+正常预算速率从本实例采样几何派生；压力测试覆盖速率必须明确记录为测试输入。
 
-```bash
-./build-linux/observation_config_compile \
-  config/testing/atfp-throughput-observation-staged.json run/full-30g \
-  --budget-payload-gbps 30
-```
+host ring 容量由 `ring_plan.json` 给出，不计入显存；增加 ring 仅提供突发缓冲，
+不能弥补长期服务能力不足。编译预算通过不代表真实吞吐验收通过。
 
-历史 30 Gbps 小几何测试链为 Beamform → Power → Integrate(K=128, MEAN)。compute block
-含 6,553,600 个时间采样，能被 128 整除；积分后 `T=51,200`。compute、Beamform、
-Power 和最终 output block 分别为 52,428,800、209,715,200、104,857,600 和 819,200 B，
-block 到达间隔 13,981,013 ns。保留 20% 余量后，单 stream 整链 deadline 为
-11,184,810 ns；H2D+D2H 合计 53,248,000 B/block，最低合计 host/device 传输速率为
-4,760,742,472 B/s。计划显存为 577,536,064 B（含 64 B 权重及算法 scratch），建议启动时
-至少有 693,043,277 B 空闲显存；该值不含 CUDA/cuBLAS/驱动 workspace。
+direct/1 的 `blocks`、input/output bytes 和 CUDA totals 可用于闭合；
+submitted/completed/published、max-inflight 和 active-window 属于 staged 调度指标，
+direct 中为 0 不表示未处理数据。
 
-同一测试配置的 host ring 容量由 `ring_plan.json` 单独给出：raw 845,414,400 B、compute
-419,430,400 B、output 6,553,600 B，合计 1,271,398,400 B。ring 容量只提供突发
-缓冲时间，不计入显存，也不能弥补下游稳态服务率不足。
-
-服务器 full-chain 功能诊断已在 1 Gbps 精确闭合。早期单次 30 Gbps 诊断中 GPU 处理 2,130
-个 block，平均 service time 为 16.243 ms，超过 13.981 ms 的 block 到达间隔和
-11.185 ms 的安全 deadline；平均 H2D/算法/D2H 分别约 12.077/3.873/0.260 ms，output
-wait 平均约 0.0013 ms。该结果定位了旧 pageable-ring/逐 block 同步路径的性能问题。
-compute-ring CUDA 直注册和三 slot staged pipeline 实现后，双 Station 小几何 full-chain
-已通过 30 Gbps、60 秒、1 warm-up + 3 measured 原型门禁。生产 Full Power
-`A=469,F=4,P=1,B=350` 与 Full coherency/Stokes `A=469,F=2,P=2,B=350` 随后也分别
-完成约 30 Gbps、60 秒、1 warm-up + 3 measured 正式门禁；权威 suite 为
-`full-30.2505Gbps-60s-20260829T033639Z` 和
-`full-30.2505Gbps-60s-20260829T075447Z`。
-
-GPU-only 生产几何压力由 repository-owned `gpu_pressure_writer` 驱动：它原样发布编译器
-生成的 `unpacked.header`，按单调时钟 deadline 写完整 compute block，并记录精确计数、
-等待、迟到和 EOD。测试分别复用 Power `A=469,F=4,P=1,B=350` 与 coherency/Stokes
-`A=469,F=2,P=2,B=350` 配置，可匹配比较 direct/1 与 staged/N；该测试不经过 Station-ID
-聚合，也不能替代多 Station sender 驱动的 full-stage 验收。
-
-Power 生产几何的正式匹配结果为 direct/1 suite
-`gpu-30Gbps-60s-20260829T113850Z` 与 staged/3 suite
-`gpu-30Gbps-60s-20260829T114602Z`。两者均完成 60 秒、1 warm-up + 3 measured；staged
-记录 `max_inflight=3`，证明三个 slot 在压力链中实际并发使用。
-
-在 direct/1 中，metrics 的 `blocks`、输入/输出 bytes、transfer elapsed 及 CUDA
-H2D/algorithm/D2H totals 是处理闭合证据；submitted/completed/published、max-inflight
-和 active-window 是 staged 调度器指标，direct 中为 0 属于未启用该调度器，而不是未处理
-数据。显存和 deadline 预算以 compiler `gpu_pipeline_budget` 为权威来源。
-
-macOS 只构建并测试 worker core；PSRDADA/CUDA 可执行文件需要在 Linux 服务器构建。
+macOS 只构建可移植 worker core；PSRDADA/CUDA 可执行文件需在 Linux 服务器构建。
