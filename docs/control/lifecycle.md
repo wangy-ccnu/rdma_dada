@@ -1,10 +1,10 @@
-# Observation control lifecycle (MS-06)
+# Observation control lifecycle
 
-This interface exercises observation-wide control with an injected host adapter
-and clocks. It implements durable requests, action uncertainty, local failure
-isolation and explicit cleanup records. It does not launch a pipeline, access a
-host, operate rings, or collect live rates. Local tests and Linux offline tests
-are development evidence for this contract, not real-host acceptance.
+MS-06 implements observation-wide decisions with an injected host adapter and
+clocks. MS-07a supplies SSH transport; the MS-07b/c implementation below adds a
+host supervisor and actual pipeline adapter. The latter is integrated but still
+awaits batch review and server acceptance. None of these lifecycle interfaces
+supplies live data-rate or sample-time telemetry (P4).
 
 ## Public interface
 
@@ -300,8 +300,9 @@ adapter.send((server_id, gpu_id), command) -> dict
 ```
 
 `endpoints` is a nonempty trusted deployment dictionary keyed by server ID.
-Each entry contains exactly `ssh_host`, `python_path`, `host_entrypoint` and
-`known_hosts_file`. The first is a hostname/SSH alias, optionally `user@host`;
+Each entry requires `ssh_host`, `python_path`, `host_entrypoint` and
+`known_hosts_file`, with optional `deployment_path` for the production host CLI.
+The first is a hostname/SSH alias, optionally `user@host`;
 IP literals with colons and arbitrary SSH options are not accepted. The paths
 are absolute Unicode scalar strings without control characters. The explicit
 known-hosts path is on the control host and additionally excludes quotes,
@@ -326,8 +327,9 @@ newline must fit 1 MiB and is validated before launch.
 
 Each call makes one direct SSH dispatch from the control host to the configured
 host. Local execution uses an argv list with `shell=False`. SSH still uses a
-remote shell: only the trusted fixed `[python_path, '-B', host_entrypoint]` is
-quoted with `shlex.quote` into its command string. Runtime payload is written
+remote shell: only the trusted fixed `[python_path, '-B', host_entrypoint]`, plus
+`['--deployment', deployment_path]` when configured, is quoted with `shlex.quote`
+into its command string. Runtime payload is written
 only to stdin. The adapter uses `-T`, `BatchMode=yes`,
 `StrictHostKeyChecking=yes`, an explicit quoted `UserKnownHostsFile`,
 `ConnectionAttempts=1` and an integer `ConnectTimeout` in `[1, 3600]`, rounded
@@ -412,4 +414,130 @@ echo/exit7 probes passed with no task residue. See the original
 [coordinator audit](evidence/ms07a-acceptance-audit-20261011.json), which retains
 extra repetitions and the notification-only hash change. This accepts only
 command transport; host supervision, disconnected process survival, real
-observation resources and business telemetry are still unimplemented here.
+observation resources and business telemetry were outside that acceptance.
+
+## Host supervision and pipeline adapter (MS-07b/c)
+
+Build and no-dataflow gates are accepted on 2026-10-15; see the
+[stage result](evidence/ms07bc-build-gates-20261015.json). Actual multi-instance
+dataflow and native lifecycle functional acceptance remain pending.
+
+The trusted host entrypoint is:
+
+```text
+python3 -B scripts/multiserver_host.py --deployment /absolute/private/host.json
+```
+
+One bounded strict JSON command arrives on stdin; one host report returns on
+stdout. The deployment is an operator-owned private regular file, not a path or
+executable selected by request JSON. Its root is private and canonical. It binds
+the installed bundle and each run/server/GPU/observation identity to its physical
+GPU UUID, CPU/core identities, expanded IPC key family, flow and run directory.
+Configuration additionally supplies explicit request/stop deadlines and a fixed
+`runtime.kind = "pipeline"` mapping. There is no arbitrary plugin loader.
+
+The pipeline runtime requires SHA-bound absolute binaries for the compiler,
+`numactl`, `dada_db`, `dada_dbnull`, receiver, unpack, GPU worker and GPU probe;
+an explicit environment; bounded readiness/drain/poll intervals; and the observed
+PSRDADA exclusive-create/max-readers/header-buffer contract. CUDA ordinal
+remapping is refused. `leaf` is an assertion about an independently reviewed
+no-fork executable, not proof inferred from an empty process listing. New binary
+identities need that review before they can support descendant-cleanup evidence.
+
+The CLI uses a durable mailbox and detached supervisor with redirected streams.
+The supervisor retains the original child handles across ordinary SSH request
+exits. One host-local SQLite journal records claims and action intent before
+side effects. PID/start ticks/boot ID/UID and retained child ownership gate
+signalling; no name-based, process-group or recovered-nonchild kill is allowed.
+Uncertain actions are reconciled, never blindly replayed. A dead supervisor is
+UNKNOWN, not permission to auto-start a replacement. Current deployment binding
+is immutable for that supervisor. A batch pre-installs all run bindings and shares
+one host journal; sequential runs may reuse resources only after exact claim
+release. Do not create an independent root per repetition to bypass conflicts.
+After the batch, the operator may invoke the same CLI with `--retire` (no stdin).
+It refuses while any claimed instance is active, unclean, unresolved or while
+commands are queued. Confirmed retirement closes the retained supervisor and
+releases its daemon lock without signalling workers; result is `RETIRED` with
+`cleanup=CONFIRMED`. `REFUSED`/`UNKNOWN` must not be relabelled successful cleanup.
+The deployment cannot then auto-restart; subsequent deployment/recovery remains
+an explicit operator action, not an implicit response to missing processes.
+
+Preparation verifies bundle/compiler identities, physical resources and the full
+IPC family before exclusive creation. It records exact object fingerprints and
+starts output sink → GPU → unpack → receiver. READY means the configured processes
+and input interfaces are prepared, not that a data-dependent GPU transfer or
+calculation has completed. Optional ready/result files bind PID, configuration,
+geometry and ring keys; existing algorithm/layout/header contracts are unchanged.
+
+Start preserves the original Observation UTC and exact duration string. Each
+instance has its own deadline scheduler so one slow drain does not prevent a
+healthy peer's deadline. At observation end or manual stop, ingress is stopped
+first; consumers drain before bounded, exact-owned forced termination. The
+wall-clock deadline initiates drain but does not prove data completion. Normal
+completion requires actual Station/sample extent, GPU bytes/publication, EOD and
+resource cleanup. Forced or manual termination cannot become normal PASS.
+
+Ring cleanup checks recorded SysV object IDs and ownership/size/creation facts,
+and refuses attached or replaced objects. Partial allocation without sufficient
+ownership evidence remains UNKNOWN; a pre-run absence check alone never
+authorizes removal. Claims release only after matching process/descendant/IPC
+cleanup evidence. Run records and failure evidence are retained, not treated as
+disposable resources.
+
+Before a server dataflow test, build `psrdada_ipc_layout_probe` and run the
+registered `multiserver_native_ipc_layout_test`. This read-only header/ABI check
+compares installed PSRDADA constants and native structure size with the ownership
+footprint model. Portable tests explicitly skip this native check; a skipped check
+does not authorize real IPC creation. A changed PSRDADA ABI must be resolved first.
+
+Local development gates:
+
+```bash
+python3 -B -m unittest discover -s tests -p 'multiserver_*_test.py'
+python3 -B tests/multiserver_pipeline_runtime_test.py --compiler /absolute/observation_config_compile
+```
+
+The first includes explicit Linux/compiler skips on unsupported local platforms.
+It is not real-host acceptance. The opt-in `tests/pipeline_lifecycle_hooks_test.py
+--deployment /absolute/host.json` creates real resources and is reserved for the
+server owner's validated fixture; never enable it during ordinary local discovery.
+Unified server tests must cover the unchanged control API through this actual
+runtime, not just doubles or a successful dry-run. See the maintained roadmap
+and task ledger for the pending matrix and frozen source identity.
+
+### Unified functional acceptance entrypoint
+
+On HF, the server test owner uses the versioned runner:
+
+```text
+python3 -B scripts/multiserver_acceptance.py --suite /absolute/suite.json --output /absolute/feature/results/campaign
+```
+
+The trusted suite declares source/build identity, SSH endpoints, bounded deadlines
+and exactly three repetitions per case. Bundles, sender configs and host deployments
+must already bind all run IDs and fixed future UTC windows. Tests send only formal
+observation-window data, without preparation traffic. Startup readiness remains
+required. The fixed peer fixture owns senders and reads receiver evidence; request
+JSON cannot provide executable paths, arbitrary commands or signal targets.
+
+Cases cover single and two-GPU operation (equal channels and one extra channel),
+all-ready gating, preparation rollback, finite EOD, graceful/forced manual stop,
+isolated runtime failure and disconnect/reconnect. Here preparation rollback means
+resource initialization failure, not pre-observation data transmission. Its private
+negative bundle declares one SHA-bound deviation and the exact rejected instance.
+Runtime failure must match the preinstalled fault target, process identity and
+authoritative GPU exit; a different failed instance cannot satisfy the test.
+Healthy instances continue after a local GPU failure; authoritative input-sender
+failure stops the whole test transfer.
+
+Compiler work is also an owned retained subprocess with a readiness deadline and
+bounded log reads. Unknown liveness/reaping cannot justify releasing its claim.
+Temporary observation uncertainty does not by itself kill a healthy pipeline or
+renew the last confirmed state. Shared optional lifecycle JSON publication uses
+exclusive temporary creation and no-replace publication.
+
+The runner records intent before effects and retains compact results, process/IPC
+proof and first-failure evidence. `--resume` reconciles and stops unfinished runs;
+it never replays starts or injections and marks interrupted verification incomplete.
+Cleanup cannot overwrite the test outcome. A failed cleanup stops subsequent cases.
+This is functional acceptance, not a throughput or real-time performance campaign.

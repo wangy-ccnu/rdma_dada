@@ -1,121 +1,93 @@
 # Multi-server development task ledger
 
 Coordinator: 多服务器同步开发 (`01a090fd-55d8-7b83-9ea1-1a53eaa1b952`).
+Branch: `codex/multi-server-observation`. Updated: 2026-10-15.
 Procedure: [delegated development](../agents/delegated-development.md).
-Branch: `codex/multi-server-observation`. Updated: 2026-10-11.
 
-## Current status and reading guide
+## Current acceptance: MS-07b/c and I1
 
-| Need | Authoritative document |
+**ACCEPTED_BUILD_AND_NO_DATAFLOW_GATES**, confirmed by the user on 2026-10-15.
+Base `2b746a4`; implementation is integrated in this feature checkpoint.
+Independent specification, standards and simplicity reviews are
+closed. Coordinator portable CTest: 61 selected tests passed, plus one separately
+executed local loopback test. These local results are development evidence.
+
+[Server acceptance](evidence/ms07bc-build-gates-20261015.json) records the tested
+source manifest, build/binary identities and the accepted three-repeat gates.
+The [tested manifest](manifests/ms07bc-tested-source-20261015.sha256) preserves
+that source identity; subsequent documentation changes belong to the current
+checkpoint manifest and do not change the tested code.
+HF/qths1 source verification passed 309/309 entries. Fresh CUDA/RDMA build:
+`/home/user/wy/build-multiserver/ms07bc-20261015`. Compiler, receiver, unpack,
+GPU worker and read-only PSRDADA ABI probe built successfully; 13 selected
+registered tests met the three-consecutive-pass requirement. Host-test acceptance
+uses the isolated three-pass sequence. Remote logs were not changed.
+
+This accepts compilation, controller/host/process tests, compiler integration and
+read-only ABI checks. It does **not** accept real packet reception, GPU data flow,
+multi-instance data closure, runtime fault isolation or throughput. No task
+dataflow resources or temporary capabilities were created. Functional acceptance
+remains pending; temporary CAP_NET_RAW, if needed, still requires authorization.
+Future tests send no preparation traffic; see [testing policy](../agents/testing.md).
+
+### Retained implementation tasks
+
+All five use gpt-6.1-sol/high from base `2b746a4`. Paths below are relative to
+`/Users/ywang/.codex/worktrees/`; all checkouts remain retained. Shared integration,
+CMake and maintained guides belong to the coordinator, not to child carry-in files.
+
+| Task title | Task ID | Checkout | Owned implementation |
+|---|---|---|---|
+| MS-07b B1 主机资源归属与持久记录 | `01a13e05-f037-7fb2-8b7d-6969b0bdb370` | `5eaa/rdma_dada` | `ownership.py`, ownership tests |
+| MS-07b B2 进程身份与后台监管 | `01a13e1d-cfa8-7cb0-96f3-64ad8acb2726` | `b910/rdma_dada` | `processes.py`, process tests |
+| MS-07b B3 主机命令与常驻监管入口 | `01a13e2a-02f6-7582-8a36-187e03fcef87` | `dca7/rdma_dada` | `host_agent.py`, host CLI/tests |
+| MS-07c C1 实际流水线生命周期接入 | `01a13eab-ef59-7992-82ce-e813c3872c50` | `5cf9/rdma_dada` | runtime/compiler integration, optional app hooks, shared lifecycle publisher and tests |
+| MS-07 I1 统一功能验收入口 | `01a13edf-bd5e-7691-8e0b-642805af5477` | `04ed/rdma_dada` | acceptance runner/tests and fixed peer fixture |
+
+Implementation deliveries and the accepted no-dataflow stage are closed;
+all five conversations are ARCHIVED on 2026-10-15, independently confirmed in
+the app's archived-thread listing. Remaining real functional acceptance is
+explicitly transferred to the coordinator and existing server-test task, not
+marked complete. No implementation correction is currently assigned to these
+children. Archive conversations only; retain all source checkouts and evidence.
+Some child callbacks were denied; the coordinator retrieved their original frozen
+deliveries through thread read/wait before review and integration.
+
+### Evidence still needed for the next stage
+
+- Use the existing versioned acceptance runner and immutable suite/deployments:
+  single instance, two GPUs with equal/+1 channels, all-ready gating, rollback,
+  finite EOD, graceful/forced stop, local failure with healthy peer continuing,
+  and disconnect/reconnect; three clean repetitions per functional case.
+- The [Phase0 refresh](evidence/ms07b-phase0-20261015.json) supplies observed tools,
+  topology and permissions. The [disconnect probe](evidence/ms07b-disconnect-probe-20261015.json)
+  proves ordinary SSH-request exit survival and natural child exit only, not
+  reboot recovery, all-session logout survival or full pipeline operation.
+- Dataflow permissions, exact fixture inputs and available receiving hosts must
+  be resolved before launch. One receiver host with two GPUs is not cross-host
+  receiver acceptance. No new saturation campaign is included.
+- Product contracts, failure/cleanup rules and runner invocation are maintained
+  only in [lifecycle](lifecycle.md); remaining work and isolation are in the
+  [roadmap](../superpowers/plans/2026-09-12-multi-server-control-roadmap.md).
+  Live business telemetry and UI remain later work.
+
+## Accepted earlier stages
+
+| Scope | Evidence / tested identity |
 |---|---|
-| Current project status | [PROJECT_STATUS](../PROJECT_STATUS.md) |
-| Inputs, bundle generation, compiler resolution and configuration tests | [configuration](configuration.md) |
-| Controller/store API, host contract, stop/restart policy and offline tests | [lifecycle](lifecycle.md) |
-| Agreed system requirements | [design](../superpowers/specs/2026-09-12-multi-server-observation-design.md) |
-| Remaining work and branch/server isolation | [roadmap](../superpowers/plans/2026-09-12-multi-server-control-roadmap.md) |
-| MS-01/02 validator acceptance | [MS-01/02 acceptance](ms01-ms02-acceptance.md) |
-| MS-03/04/05 configuration acceptance | [MS-03–05 acceptance](ms03-ms05-acceptance.md) |
-| MS-06 offline lifecycle acceptance | [MS-06 acceptance](ms06-acceptance.md) |
+| MS-01/02 configuration validation | [acceptance](ms01-ms02-acceptance.md); `manifests/ms01-source.sha256`, `ms02-source.sha256` |
+| MS-03–05 weights/bundles/compiler | [acceptance](ms03-ms05-acceptance.md); `manifests/ms03-ms05-tested-source.sha256` |
+| MS-06 offline lifecycle | [acceptance](ms06-acceptance.md); `manifests/ms06-tested-source.sha256`; committed `d1580f6` |
+| MS-07a transport only | [server result](evidence/ms07a-acceptance-20261011.json), [audit](evidence/ms07a-acceptance-audit-20261011.json); `manifests/ms07a-source-20261011.sha256` |
+| Observation-only interface cleanup | [server result](evidence/ms08-observation-cleanup-acceptance-20261011.json); `manifests/ms08-source-20261011.sha256` |
 
-MS-01–05 are committed and accepted for offline configuration. MS-06 is
-reviewed/server-accepted for offline control and committed as `d1580f6`.
-All six child conversations are confirmed archived. No live host supervisor,
-distributed process startup, telemetry or Web/CLI acceptance is implied.
-Next work is roadmap P3, followed by P4–P6; it requires its own bounded handoff.
-
-P3/MS-07 read-only environment investigation is reviewed (2026-10-11), performed by
-`GPU服务器代码测试` (`019fbb68-ae6f-77f0-bfdd-30bc30bd6c45`) from committed
-base `78b909e`. Scope: read-only HF/qths1 supervision, transport, ownership and
-readiness prerequisites. Original [evidence](evidence/ms07-phase0-20261011.json)
-and [supplement](evidence/ms07-phase0-supplement-20261011.json) were retrieved and
-reviewed; both callbacks were delivered. No source synchronization, build, CTest
-or data flow occurred. Facts support the MS-07a transport plan, not live-host
-acceptance: JSON round-trip/disconnect survival and effective logind session
-cleanup remained unproven at Phase0. MS-07a later verified the JSON round-trip;
-disconnect survival and logind behavior remain future gates. MS-07a was approved on2026-10-11. Its persistent
-gpt-6.1-sol/high worktree task was requested from feature base78b909e;
-task ID `01a129ce-5383-79a3-abe1-1f6712304f9a` is ACCEPTED_TRANSPORT_ONLY as
-**MS-07a SSH命令传输**, checkout
-`/Users/ywang/.codex/worktrees/14f7/rdma_dada`.
-Scope is transport/tests/CMake/lifecycle guide only.
-The child froze its implementation; spec and standards review passed after one
-timeout-range correction. Command timeouts now have an explicit one-hour maximum,
-rejected before spawn when out of range. Coordinator independently reran the
-final transport 22/22 and verified the reviewed five-file delivery was integrated
-byte-for-byte into this feature checkout. Store/controller/transport registered
-CTest passed 3/3 locally. Linux registered tests met the three-repeat gate and
-HF→qths1 JSON-only echo/exit7 probe passed 3/3. No data flow was started.
-The child's callback was denied by the messaging tool; the coordinator retrieved
-the full original delivery using the thread read/wait interface and continued
-review. Its corrected delivery was later successfully received after explicit
-human authorization. Notification failure is not an implementation or test failure.
-The server callback was delivered successfully. See the original
-[acceptance](evidence/ms07a-acceptance-20261011.json) and
-[coordinator audit](evidence/ms07a-acceptance-audit-20261011.json): all actual
-extra repetitions are retained (store6/controller9/transport9, 834 case
-executions), and the notification-only evidence hash transition is explained.
-The tested source identity is frozen in
-[MS-07a manifest](manifests/ms07a-source-20261011.sha256), SHA256
-`3ed01d0f76a147f75b41d7f86c7a2c5ee91b30de0c389353e44d5afd4e31824b`.
-Post-test status-document edits do not rewrite that tested snapshot. No automatic
-commit/push/merge. After the acceptance notice, the child conversation was
-confirmed archived through the app's archived-thread listing; its source
-worktree, reviewed implementation and test evidence remain retained.
-Coordinator-owned Phase0 evidence, roadmap and this ledger are read through
-their existing absolute paths, not assumed to exist in the fresh checkout.
-
-MS-07a preflight plan check: the transport produces the existing MS-06
-`host_adapter.send` contract without changing controller/store behavior;
-MS-07b will supply the production host entrypoint. The independent MS-07a
-fixture is JSON-only, not a substitute supervisor. There are no concurrent
-implementation owners of transport/tests/CMake/lifecycle. Test obligations
-match the byte limits, timeouts, strict JSON and uncertainty behavior described
-in the roadmap; no plan conflict identified.
-
-## Task identity and retained source
-
-Observation-only interface cleanup is ACCEPTED (user-approved 2026-10-11), ahead
-of MS-07b. Task **Observation旧配置接口清理**
-(`01a12abc-4498-7883-8d45-0b7966a70533`, gpt-6.1-sol/high) uses isolated
-checkout `/Users/ywang/.codex/worktrees/20b8/rdma_dada`, base `78b909e` plus
-the five reviewed MS-07a carry-in files. It owns removal of standalone legacy
-pipeline/unpack/worker configuration loaders, examples and conversion/inspect
-tools; migration of useful regression coverage to Observation/resolved plans;
-and affected configuration/test guides and CMake registrations. Runtime structs,
-geometry helpers and algorithms remain; sender schemas, original evidence and
-paper branches are out of scope. Coordinator owns integration, independent
-review and server handoff. No automatic commit/push or new performance campaign.
-
-Implementation is frozen and integrated into this checkout. Independent spec and
-standards review passed; retained runtime/geometry implementations are unchanged.
-The child clean portable build passed 52 registered tests (excluding unrelated
-sender loopback); the coordinator independently reran nine affected tests and
-confirmed compiler preflight output is byte-identical to the pre-cleanup baseline.
-Local evidence remains in the child checkout's
-`build-observation-only-final/local-evidence/`.
-The server [read-only readiness evidence](evidence/ms08-phase0-config-cleanup-20261011.json)
-confirms the fixed CUDA/CMake/PSRDADA environment. Linux/CUDA
-[acceptance](evidence/ms08-observation-cleanup-acceptance-20261011.json) passed:
-323/323 mirrored files on HF/qths1, fresh CUDA/RDMA build, 17 registered tests
-each repeated three times (51 executions). Coordinator retrieved the original
-server command output `exec-5f4cef44-52bf-4746-85cd-d8df7db2427f` from turn
-`01a12acd-ecca-75d3-8280-a6eb6ec5937c`, independently counted all 51 PASS lines
-and checked all 17 exit-zero records. No data flow or rings were created.
-The tested [source manifest](manifests/ms08-source-20261011.sha256) preserves
-SHA256 `86c5fba8e56fffc1858c2950d003a3d5d1d0429b2430c3ffcd02bcf3452be499`;
-later status-document edits do not change the tested implementation.
-Both server callback attempts were denied; original delivery was retrieved by
-thread wait/read. This is a notification failure, not a test failure.
-Remote acceptance copies retain pre-notification SHA256 `041df0dbabce8ddabe2ee68295a9898bfe85fbf6742f1b457c17e767d631ee4a`;
-the local original adds notification failure metadata only, SHA256
-`683a7bedb2f464b7e13ca59bbb4f14b3ea3a019f76cde344064dbf51a2cbceeb`.
-After acceptance notification, the child decided to archive its conversation;
-the coordinator confirmed its ID in the app's archived-thread listing on
-2026-10-11. Its retained worktree and evidence remain intact.
-No commit/push was performed.
-
-All checkouts below are retained; archived means conversation visibility only.
-MS-04a/04b were checkpoints in the same MS-04 task, not separate tasks.
+Observation cleanup task **Observation旧配置接口清理**
+(`01a12abc-4498-7883-8d45-0b7966a70533`, gpt-6.1-sol/high),
+checkout `20b8/rdma_dada`, base `78b909e` plus reviewed MS-07a carry-in:
+ACCEPTED / ARCHIVED 2026-10-11. It removed legacy standalone configuration
+interfaces without changing algorithms/geometry. Its 17 Linux/CUDA registered
+tests passed three times; original command evidence was retrieved after callback
+failure. The result records the notification-only metadata difference.
 
 | Task title | Task ID | Model / effort | Base | Native checkout suffix under /Users/ywang/.codex/worktrees/ | Status |
 |---|---|---|---|---|---|
@@ -127,26 +99,21 @@ MS-04a/04b were checkpoints in the same MS-04 task, not separate tasks.
 | MS-06 观测控制生命周期 | `01a128d3-928e-75d0-9a64-22ff35d0cad7` | gpt-6.1-sol / high | 82ac66f | `bec6/rdma_dada` | ACCEPTED_OFFLINE_CONTROL / ARCHIVED 2026-10-11 |
 | MS-07a SSH命令传输 | `01a129ce-5383-79a3-abe1-1f6712304f9a` | gpt-6.1-sol / high | 78b909e | `14f7/rdma_dada` | ACCEPTED_TRANSPORT_ONLY / ARCHIVED 2026-10-11; integrated locally |
 
-New development uses gpt-6.1-sol/high; historical model settings are not rewritten.
-MS-01/02 were integrated before base5851eaed; MS-03–05 were committed in82ac66f.
-MS-06 implementation, tests and frozen acceptance evidence were committed in
-`d1580f6` on2026-10-11 at the user's request; no merge into the paper branch.
-The coordinator confirmed archived IDs independently. Several child/server
-callbacks were refused; acceptance relied on retrieved original reports and
-command evidence, not an assumed notification. See each acceptance record.
 
-## Evidence and document maintenance
+Archived means conversation visibility only; source and evidence remain retained.
+MS-04a/04b were checkpoints in one task. Historical model settings are not rewritten.
 
-Keep only information a user needs to read or future development/tests need to
-use. Completed handoffs, review rounds and step-by-step plans are removed once
-their unique contracts, limitations, reproduction commands and final findings
-are incorporated into the documents above. No second archive directory is needed.
+## Document and JSON retention
 
-Acceptance JSON and frozen manifests under `evidence/` and `manifests/` remain
-unchanged. Historical manifests describe their tested source snapshots, including
-documents subsequently consolidated; they are not checks of today's checkout.
-Original snapshots remain traceable through the retained source checkouts and
-recorded Git bases. Generate current feature identity at stage/test handoff
-checkpoints, never rewrite historical test identities to fit later documents.
-Paper/ablation branches, accepted catalogs and remote artifacts are outside this
-documentation cleanup. Commit, push and merge remain user decisions.
+Keep material only when a user needs to read it or later development/testing needs
+to use it. Usage/contracts belong in configuration/lifecycle guides, next actions
+in the roadmap, status/task identity here and in PROJECT_STATUS, machine-readable
+results in evidence JSON. Do not copy per-round delivery/review transcripts into
+these documents or create another archive/status report.
+
+Keep executable schemas/examples/fixtures and authoritative evidence with their
+frozen identities. A result JSON and its concise guide link are complementary,
+not duplicate reports. Historical manifests describe tested snapshots, not today's
+edited documentation. Refresh current identity only at the next stage freeze.
+Paper/ablation branches, remote artifacts and retained child checkouts are outside
+this cleanup. Commit/push/merge remain user decisions.

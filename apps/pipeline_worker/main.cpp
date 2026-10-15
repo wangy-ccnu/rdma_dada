@@ -1,3 +1,4 @@
+#include "rdma_dada/control/lifecycle_json.h"
 #include "rdma_dada/modules/device_to_host/device_to_host_module.h"
 #include "rdma_dada/modules/host_to_device/host_to_device_module.h"
 #include "rdma_dada/modules/complex_convert/complex_convert_module.h"
@@ -21,6 +22,7 @@
 #endif
 
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
 #include <csignal>
 #include <cstddef>
@@ -33,12 +35,15 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <unistd.h>
 
 namespace {
 
 volatile std::sig_atomic_t stop_requested = 0;
 
 void HandleSignal(int) { stop_requested = 1; }
+
+using rdma_dada::control::PublishLifecycleJson;
 
 struct WorkerRuntime {
     WorkerRuntime()
@@ -51,7 +56,10 @@ struct WorkerRuntime {
           staged_pipeline_active(false),
           next_input_sequence(0U), input_cuda_registered(false),
           registered_ring_blocks(0U), registered_ring_bytes(0U),
-          input_ring_registration_ns(0U)
+          input_ring_registration_ns(0U), lifecycle_input_eod(false),
+          lifecycle_output_eod(false), lifecycle_close_ok(false),
+          lifecycle_input_bytes(0U), lifecycle_output_bytes(0U),
+          lifecycle_published_blocks(0U)
 #if defined(RDMA_DADA_HAVE_CUDA)
           , stream(NULL), device_input(NULL), device_converted(NULL),
           device_scratch(NULL), device_output(NULL), event_start(NULL),
@@ -91,6 +99,12 @@ struct WorkerRuntime {
     std::uint64_t registered_ring_blocks;
     std::uint64_t registered_ring_bytes;
     std::uint64_t input_ring_registration_ns;
+    bool lifecycle_input_eod;
+    bool lifecycle_output_eod;
+    bool lifecycle_close_ok;
+    std::uint64_t lifecycle_input_bytes;
+    std::uint64_t lifecycle_output_bytes;
+    std::uint64_t lifecycle_published_blocks;
     std::vector<std::uint8_t> host_scratch;
     std::vector<std::uint8_t> host_converted;
 #if defined(RDMA_DADA_HAVE_CUDA)
@@ -1185,6 +1199,9 @@ int CloseTransfer(dada_client_t* client, std::uint64_t) {
     WorkerRuntime* runtime =
         static_cast<WorkerRuntime*>(client ? client->context : NULL);
     if (!runtime) return -1;
+    // Sample the actual reader EOD before dada_client_read resets the ring.
+    runtime->lifecycle_input_eod =
+        ipcbuf_eod(reinterpret_cast<ipcbuf_t*>(client->data_block)) > 0;
     bool cleanup_failed = false;
     if (runtime->staged_pipeline_active) {
         const rdma_dada::pipeline::StageStatus drain_status =
@@ -1256,6 +1273,10 @@ int CloseTransfer(dada_client_t* client, std::uint64_t) {
     const rdma_dada::pipeline::WorkerMetrics& final_metrics =
         runtime->staged_pipeline_active ? runtime->gpu_pipeline.metrics() :
                                           runtime->metrics;
+    runtime->lifecycle_input_bytes = final_metrics.input_bytes();
+    runtime->lifecycle_output_bytes = final_metrics.output_bytes();
+    runtime->lifecycle_published_blocks = runtime->staged_pipeline_active
+        ? final_metrics.published_blocks() : final_metrics.blocks();
     runtime->metrics_finalized = true;
     if (!final_metrics.WriteJson(runtime->metrics_path, &metrics_error)) {
         SetFailure(runtime, metrics_error);
@@ -1267,10 +1288,15 @@ int CloseTransfer(dada_client_t* client, std::uint64_t) {
         if (dada_hdu_unlock_write(runtime->output_hdu) < 0) {
             SetFailure(runtime, "cannot unlock output DADA ring");
             cleanup_failed = true;
+        } else {
+            // PSRDADA unlock_write closes its open writer, publishing EOD.
+            // This is a successful library operation, not an exit-code guess.
+            runtime->lifecycle_output_eod = true;
         }
         runtime->output_locked = false;
     }
     if (!runtime->failed && !cleanup_failed) {
+        runtime->lifecycle_close_ok = true;
         multilog(runtime->log, LOG_INFO, "pipeline transfer completed\n");
     }
     return runtime->failed || cleanup_failed ? -1 : 0;
@@ -1278,23 +1304,31 @@ int CloseTransfer(dada_client_t* client, std::uint64_t) {
 
 void PrintUsage(const char* program) {
     std::cerr << "Usage: " << program
-              << " RESOLVED_OBSERVATION.json [--metrics-json PATH]\n";
+              << " RESOLVED_OBSERVATION.json [--metrics-json PATH]"
+              << " [--ready-file PATH] [--result-json PATH]\n";
 }
 
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 2 && argc != 4) {
+    if (argc < 2 || argc % 2 != 0) {
         PrintUsage(argv[0]);
         return EXIT_FAILURE;
     }
-    if (argc == 4 && std::string(argv[2]) != "--metrics-json") {
-        PrintUsage(argv[0]);
-        return EXIT_FAILURE;
-    }
-
     WorkerRuntime runtime;
-    if (argc == 4) runtime.metrics_path = argv[3];
+    std::string ready_path;
+    std::string result_path;
+    for (int index = 2; index < argc; index += 2) {
+        const std::string option = argv[index];
+        std::string* target = option == "--metrics-json" ? &runtime.metrics_path :
+            option == "--ready-file" ? &ready_path :
+            option == "--result-json" ? &result_path : NULL;
+        if (!target || !target->empty() || argv[index + 1][0] == '\0') {
+            PrintUsage(argv[0]);
+            return EXIT_FAILURE;
+        }
+        *target = argv[index + 1];
+    }
     std::string config_error;
     if (!rdma_dada::LoadResolvedObservationPlan(
             argv[1], &runtime.plan, &config_error) ||
@@ -1378,8 +1412,18 @@ int main(int argc, char** argv) {
         client->header_transfer = 0;
         client->quiet = 1;
 
+        std::ostringstream ready;
+        ready << "{\"schema_version\":1,\"pid\":" << getpid()
+              << ",\"config_id\":\"" << runtime.plan.config_id
+              << "\",\"geometry_id\":\"" << runtime.plan.geometry_id
+              << "\",\"input_key\":" << runtime.config.input_key
+              << ",\"output_key\":" << runtime.config.output_key << "}\n";
+        if (!PublishLifecycleJson(ready_path, ready.str())) {
+            SetFailure(&runtime, "cannot publish lifecycle ready file");
+        }
+
         bool keep_running = true;
-        while (keep_running && !stop_requested) {
+        while (keep_running && !stop_requested && !runtime.failed) {
             runtime.failed = false;
             runtime.error.clear();
             if (dada_client_read(client) < 0 || runtime.failed) {
@@ -1442,5 +1486,23 @@ int main(int argc, char** argv) {
     if (runtime.output_hdu) dada_hdu_destroy(runtime.output_hdu);
     if (input_hdu) dada_hdu_destroy(input_hdu);
     multilog_close(runtime.log);
+    std::ostringstream final_result;
+    final_result << "{\"schema_version\":1,\"pid\":" << getpid()
+        << ",\"config_id\":\"" << runtime.plan.config_id
+        << "\",\"geometry_id\":\"" << runtime.plan.geometry_id
+        << "\",\"input_key\":" << runtime.config.input_key
+        << ",\"output_key\":" << runtime.config.output_key
+        << ",\"ok\":" << (result == EXIT_SUCCESS && !runtime.failed &&
+                                  runtime.lifecycle_close_ok ? "true" : "false")
+        << ",\"input_bytes\":" << runtime.lifecycle_input_bytes
+        << ",\"output_bytes\":" << runtime.lifecycle_output_bytes
+        << ",\"published_blocks\":" << runtime.lifecycle_published_blocks
+        << ",\"input_eod\":" << (runtime.lifecycle_input_eod ? "true" : "false")
+        << ",\"output_eod\":" << (runtime.lifecycle_output_eod ? "true" : "false")
+        << "}\n";
+    if (!PublishLifecycleJson(result_path, final_result.str())) {
+        std::cerr << "pipeline_worker: cannot publish lifecycle result file\n";
+        return EXIT_FAILURE;
+    }
     return result;
 }

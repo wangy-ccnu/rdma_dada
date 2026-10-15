@@ -90,14 +90,22 @@ def _owned(workspace, identity):
         raise ValueError("STAGING_OWNERSHIP: diagnostic workspace replaced; writes refused: " + str(workspace)) from error
 
 
-def resolve_instance(instance_directory: Path, compiler: Path, output: Path) -> dict:
+def resolve_instance(instance_directory: Path, compiler: Path, output: Path, *, run_compiler=None) -> dict:
     """Validate compiler artifacts and publish without changing portable inputs.
 
     Before-publication failures retain diagnostics and raise ValueError.
     Published artifacts survive cleanup errors, reported as persistent warnings
     or a structured error explicitly identifying publication success.
     Runtime resource readiness is outside compiler validation.
+
+    Optional run_compiler(argv) is the host's bounded compiler executor, bound
+    to its existing retained supervisor/owner/deadline/environment. It returns
+    CompletedProcess or raises TimeoutExpired, with compiler_process and
+    output_truncated evidence attributes. The three-argument MS05 path retains
+    its existing subprocess behavior and result shape.
     """
+    if run_compiler is not None and not callable(run_compiler):
+        raise ValueError('COMPILER_RUNNER: compiler executor must be callable')
     instance = _safe_path(instance_directory)
     output = _safe_path(output)
     compiler = Path(compiler).resolve()
@@ -134,14 +142,33 @@ def resolve_instance(instance_directory: Path, compiler: Path, output: Path) -> 
                 "inputs": inputs, "evidence_directory": str(workspace)}
     try:
         try:
-            completed = subprocess.run(argv, stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE, text=True, check=False)
+            completed = (run_compiler(argv) if run_compiler is not None else
+                         subprocess.run(argv, stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE, text=True, check=False))
+        except subprocess.TimeoutExpired as error:
+            def partial(value):
+                return value.decode('utf-8',errors='replace') if isinstance(value,bytes) else value or ''
+            process=getattr(error,'compiler_process',None)
+            evidence.update(stdout=partial(error.stdout),stderr=partial(error.stderr),
+                            timeout_seconds=error.timeout,
+                            returncode=process.get('returncode') if process is not None else None)
+            for name in ('compiler_process','output_truncated','compiler_log_error'):
+                if hasattr(error,name):
+                    evidence[name]=getattr(error,name)
+            raise ValueError('COMPILER_TIMEOUT: compiler exceeded {} seconds'.format(error.timeout)) from error
         except (OSError, UnicodeError) as error:
             evidence["stderr"] = str(error)
+            if hasattr(error,'compiler_process'):
+                evidence['compiler_process']=error.compiler_process
             raise ValueError("COMPILER_LAUNCH: " + str(error)) from error
         evidence.update(returncode=completed.returncode, stdout=completed.stdout, stderr=completed.stderr)
+        for name in ('compiler_process','output_truncated'):
+            if hasattr(completed,name):
+                evidence[name]=getattr(completed,name)
         if completed.returncode != 0:
             raise ValueError("COMPILER_EXIT: existing compiler returned " + str(completed.returncode))
+        if any(getattr(completed,'output_truncated',{}).values()):
+            raise ValueError('COMPILER_OUTPUT_LIMIT: incomplete bounded compiler output cannot validate success')
         report = _report(completed.stdout)
         _owned(workspace, workspace_identity)
         hashes = _artifacts(artifacts, report)
@@ -158,6 +185,8 @@ def resolve_instance(instance_directory: Path, compiler: Path, output: Path) -> 
         _safe_path(output)
         _publish_exclusive(artifacts, output)
     except (ValueError, OSError) as error:
+        if hasattr(error,'compiler_process'):
+            evidence['compiler_process']=error.compiler_process
         code = str(error).split(":", 1)[0] if isinstance(error, ValueError) else "RESOLVE_IO"
         evidence.update(ok=False, published=False, evidence_directory=str(workspace), error={"code": code, "message": str(error)})
         try:

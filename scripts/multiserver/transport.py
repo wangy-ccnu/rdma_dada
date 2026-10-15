@@ -1,6 +1,8 @@
 """One-shot bounded SSH JSON transport (Python 3.8, POSIX control hosts).
 
-Endpoints are trusted deployment configuration. This module does not implement
+Endpoints are trusted deployment configuration. An optional deployment_path
+selects the operator-installed host configuration, never a client command field.
+This module does not implement
 remote supervision, action deduplication, cancellation or lifecycle validation.
 """
 import json
@@ -121,7 +123,8 @@ class SSHHostAdapter:
         for server_id, endpoint in endpoints.items():
             if not _scalar(server_id) or not server_id:
                 raise ValueError('endpoint server identity is invalid')
-            if type(endpoint) is not dict or set(endpoint) != _ENDPOINT_FIELDS:
+            if (type(endpoint) is not dict or
+                    set(endpoint) not in (_ENDPOINT_FIELDS, _ENDPOINT_FIELDS | {'deployment_path'})):
                 raise ValueError('endpoint must contain exactly the deployment fields')
             host = endpoint['ssh_host']
             if type(host) is not str or not _HOST.fullmatch(host):
@@ -129,6 +132,8 @@ class SSHHostAdapter:
             if not all(_path(endpoint[field]) for field in
                        ('python_path', 'host_entrypoint', 'known_hosts_file')):
                 raise ValueError('endpoint paths must be absolute and free of controls')
+            if 'deployment_path' in endpoint and not _path(endpoint['deployment_path']):
+                raise ValueError('deployment_path must be an absolute scalar path without controls')
             if any(character in endpoint['known_hosts_file'] for character in ('"', '\\', '%', '$')):
                 raise ValueError('known_hosts_file must be a literal path without SSH expansion')
             validated[server_id] = dict(endpoint)
@@ -150,8 +155,10 @@ class SSHHostAdapter:
             raise ValueError('transport command/target identity mismatch')
         request = _encode(command)
         endpoint = self._endpoints[server_id]
-        remote = ' '.join(shlex.quote(argument) for argument in
-                          (endpoint['python_path'], '-B', endpoint['host_entrypoint']))
+        remote_argv = [endpoint['python_path'], '-B', endpoint['host_entrypoint']]
+        if 'deployment_path' in endpoint:
+            remote_argv.extend(['--deployment', endpoint['deployment_path']])
+        remote = ' '.join(shlex.quote(argument) for argument in remote_argv)
         argv = [self._ssh_path, '-T', '-o', 'BatchMode=yes', '-o',
                 'StrictHostKeyChecking=yes', '-o',
                 'UserKnownHostsFile="' + endpoint['known_hosts_file'] + '"',

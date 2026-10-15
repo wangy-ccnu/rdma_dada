@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "task": "MS-07b/MS-07c/I1 no-dataflow server gate",
+  "source_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "source_worktree": "/Users/ywang/WorkFile/code/rdma_dada/.worktrees/multi-server-observation",
+  "remote_source": {
+    "hf": "/home/user/wy/rdma_dada-multiserver",
+    "qths1": "/home/user/wy/rdma_dada-multiserver",
+    "manifest_sha256": "2655f9ff1f06a9dd855dd2ed3fc491acbe3f06892325206516fdf45bbfa120dd",
+    "manifest_entries": 309,
+    "verification": {"hf": "PASS 309/309", "qths1": "PASS 309/309"}
+  },
+  "build": {
+    "path": "/home/user/wy/build-multiserver/ms07bc-20261015",
+    "cmake": "/home/user/wy/tools/cmake-3.31.12/bin/cmake",
+    "ctest": "/home/user/wy/tools/cmake-3.31.12/bin/ctest",
+    "cuda_compiler": "/usr/local/cuda-12.8/bin/nvcc",
+    "cuda_architecture": "86",
+    "configure": "PASS",
+    "targets": ["observation_config_compile", "rdma2dada", "vdif_unpack_worker", "pipeline_worker", "psrdada_ipc_layout_probe"],
+    "build": "PASS",
+    "binary_sha256": {
+      "observation_config_compile": "9636d9ad99ee107714c303436bf4558d66c7b7e8536393b1ed784fa303a8d64f",
+      "rdma2dada": "523a200b7ba59da224b184fbc33d1ba8fee70737d81e3e5a945a0d16a82c60d6",
+      "vdif_unpack_worker": "a945a2497bff0a2662825537e0cbb3530cc32c15a5525ac032e0f0d5b45035f8",
+      "pipeline_worker": "b2c95d8b1e0b91a4bf912a3367954a1b8158e69dfe83a8ab5a1c421a661d186e",
+      "psrdada_ipc_layout_probe": "68b0d6be82f8b24270c7684ecee22985372beb9ffbdfca16cf6ef24cf3183b87"
+    }
+  },
+  "ctest": {
+    "registered_commands_inspected": "PASS",
+    "repeat_until_fail_3": {
+      "multiserver_store_test": "PASS",
+      "multiserver_controller_test": "PASS",
+      "multiserver_transport_test": "PASS",
+      "multiserver_ownership_test": "PASS",
+      "multiserver_processes_test": "PASS",
+      "multiserver_host_test": "PASS",
+      "multiserver_acceptance_test": "PASS",
+      "multiserver_pipeline_compiler_test": "PASS",
+      "multiserver_compiler_unit_test": "PASS",
+      "multiserver_compile_test": "PASS",
+      "pipeline_lifecycle_publisher_test": "PASS",
+      "multiserver_native_ipc_layout_test": "PASS",
+      "generate_source_manifest_test": "PASS"
+    },
+    "host_test_accepted_repetitions": {
+      "test": "multiserver_host_test",
+      "scope": "Three consecutive isolated repetitions, not a complete execution history.",
+      "command": "/home/user/wy/tools/cmake-3.31.12/bin/ctest --test-dir /home/user/wy/build-multiserver/ms07bc-20261015 --repeat until-fail:3 -R multiserver_host_test --output-on-failure",
+      "repetitions": ["PASS", "PASS", "PASS"]
+    }
+  },
+  "native_ipc_layout": {
+    "registered_command": "/usr/bin/python3 -B /home/user/wy/rdma_dada-multiserver/tests/multiserver_ipc_layout_test.py --probe /home/user/wy/build-multiserver/ms07bc-20261015/psrdada_ipc_layout_probe -v",
+    "observed_header_constants": {"IPCBUF_READERS": 8, "IPCBUF_XFERS": 8},
+    "abi_model_values": {"readers": 8, "transfers": 8, "sync_bytes": 528, "key_bytes": 4},
+    "probe_stdout_retained": false,
+    "test_status": "PASS",
+    "note": "The original probe stdout was not retained; constants are verified from qths installed ipcbuf.h and the versioned ctypes ABI model. Therefore first-run stdout/exit provenance is UNKNOWN even though the later CTest result was PASS."
+  },
+  "retained_logs": {
+    "qths_testing_temporary": "/home/user/wy/build-multiserver/ms07bc-20261015/Testing/Temporary",
+    "available": ["LastTest.log", "LastTestsFailed.log", "CTestCostData.txt"]
+  },
+  "dataflow": {
+    "formal_dataflow_started": false,
+    "rings_created": false,
+    "network_senders_started": false,
+    "gpu_pipeline_started": false
+  },
+  "residue": {
+    "rdma2dada_or_pipeline_worker_or_unpack_processes": "NONE",
+    "task_owned_shm_or_semaphore": "NONE_OBSERVED",
+    "gpu_compute_apps": "NONE",
+    "preexisting_unrelated_shm": "PRESENT uid126 segments; not touched"
+  },
+  "TEST_RESULT": "PASS",
+  "coordinator_acceptance": {
+    "status": "ACCEPTED_BUILD_AND_NO_DATAFLOW_GATES",
+    "user_confirmed_date": "2026-10-15",
+    "real_multi_instance_dataflow": "PENDING"
+  },
+  "CLEANUP_RESULT": "PASS",
+  "RESULT_NOTIFICATION": "PASS"
+}

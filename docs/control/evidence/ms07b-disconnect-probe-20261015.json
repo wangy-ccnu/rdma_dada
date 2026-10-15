@@ -1,0 +1,145 @@
+{
+  "task": "MS-07b bounded disconnect-survival probe",
+  "coordinator_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "source_worktree": "/Users/ywang/WorkFile/code/rdma_dada/.worktrees/multi-server-observation",
+  "scope": "fixed versioned Python probe only; no product code, CMake, manifest, system service, SSH, NIC, PSRDADA, GPU or dataflow changes",
+  "implementation": {
+    "probe": "tests/multiserver_disconnect_probe.py",
+    "probe_sha256": "78c142b2b70f652abf0d5b3e88c2592f08ed7cab7f2e6ffaa43c0725451f20a7",
+    "unit_test": "tests/multiserver_disconnect_probe_test.py",
+    "unit_test_sha256": "0ff856cd96c1644974f89a271dbce8c546c590049fd9f22248eb6b1b89b1ba27",
+    "cli": ["launch", "inspect", "cleanup"],
+    "child": "self-invoked --heartbeat-child only; no arbitrary shell/external argv",
+    "scope_marker": "multiserver-disconnect-probe-v1",
+    "identity": ["pid", "pid_starttime_ticks", "uid", "boot_id"],
+    "cleanup_policy": "exact identity only; corrupted record/path or identity mismatch refuses cleanup; child lifetime bounded 1..30 seconds; cleanup never signals a live probe and requires natural exit",
+    "security_revision": "Linux /proc and kernel boot_id are authoritative; failures are PROC_UNKNOWN; malformed stat is not EXITED; local macOS tests use explicit mocks; identity is checked before zombie handling; symlinks/path escape and PID<=1/bool records are rejected before cleanup"
+  },
+  "local_tests": {
+    "command": "/usr/bin/python3 -B -m unittest discover -s tests -p multiserver_disconnect_probe_test.py -v",
+    "exit_code": 0,
+    "tests": {
+      "fixed_fixture_survives_parent_exit_and_cleans_up": "PASS",
+      "cleanup_rejects_identity_mismatch_without_deleting_record": "PASS",
+      "cleanup_rejects_corrupt_record_and_scope_marker": "PASS",
+      "rejects_symlink_and_invalid_pid_before_cleanup": "PASS",
+      "rejects_bool_or_small_pid_record": "PASS",
+      "live_probe_cleanup_refuses_without_signal": "PASS",
+      "linux_boot_id_requires_proc": "PASS",
+      "malformed_proc_stat_is_unknown_not_exited": "PASS"
+    },
+    "case_count": 8,
+    "py_compile": "PASS with task-owned temporary PYTHONPYCACHEPREFIX"
+  },
+  "remote": {
+    "source_mirror": "PASS",
+    "probe_execution": "PASS",
+    "mirror_policy": "no-delete rsync of the two versioned probe files only; this was not a complete manifest mirror acceptance",
+    "source_hashes": {
+      "HF": {
+        "tests/multiserver_disconnect_probe.py": "78c142b2b70f652abf0d5b3e88c2592f08ed7cab7f2e6ffaa43c0725451f20a7",
+        "tests/multiserver_disconnect_probe_test.py": "0ff856cd96c1644974f89a271dbce8c546c590049fd9f22248eb6b1b89b1ba27"
+      },
+      "qths1": {
+        "tests/multiserver_disconnect_probe.py": "78c142b2b70f652abf0d5b3e88c2592f08ed7cab7f2e6ffaa43c0725451f20a7",
+        "tests/multiserver_disconnect_probe_test.py": "0ff856cd96c1644974f89a271dbce8c546c590049fd9f22248eb6b1b89b1ba27"
+      }
+    },
+    "launch": {
+      "argv": [
+        "ssh", "-o", "BatchMode=yes", "HF", "--", "ssh", "-o", "BatchMode=yes", "qths1", "--",
+        "/usr/bin/python3", "-B", "/home/user/wy/rdma_dada-multiserver/tests/multiserver_disconnect_probe.py",
+        "launch", "--scope-dir", "/home/user/wy/task8c-multiserver-results/ms07b-disconnect-probe-20261015",
+        "--source-thread-id", "01a090fd-55d8-7b83-9ea1-1a53eaa1b952", "--task-id", "ms07b-disconnect-probe",
+        "--retention", "retain", "--duration-seconds", "30"
+      ],
+      "exit_code": 0,
+      "pid": 4523,
+      "pid_starttime_ticks": 688816,
+      "uid": 1000,
+      "boot_id": "9c0b0abe-6843-4671-8122-7f2a2b91f4fa",
+      "launched_utc": "2026-10-15T05:47:52Z",
+      "state": "RUNNING"
+    },
+    "second_ssh_inspect": {
+      "argv": [
+        "ssh", "-o", "BatchMode=yes", "HF", "--", "ssh", "-o", "BatchMode=yes", "qths1", "--",
+        "/usr/bin/python3", "-B", "/home/user/wy/rdma_dada-multiserver/tests/multiserver_disconnect_probe.py",
+        "inspect", "--scope-dir", "/home/user/wy/task8c-multiserver-results/ms07b-disconnect-probe-20261015"
+      ],
+      "exit_code": 0,
+      "observation": "RUNNING",
+      "pid": 4523,
+      "pid_starttime_ticks": 688816,
+      "uid": 1000,
+      "boot_id": "9c0b0abe-6843-4671-8122-7f2a2b91f4fa",
+      "proc_state": "R"
+    },
+    "natural_exit_inspect": {
+      "argv": [
+        "ssh", "-o", "BatchMode=yes", "HF", "--", "ssh", "-o", "BatchMode=yes", "qths1", "--",
+        "/usr/bin/python3", "-B", "/home/user/wy/rdma_dada-multiserver/tests/multiserver_disconnect_probe.py",
+        "inspect", "--scope-dir", "/home/user/wy/task8c-multiserver-results/ms07b-disconnect-probe-20261015"
+      ],
+      "exit_code": 0,
+      "observation": "EXITED",
+      "record_state": "R"
+    },
+    "operation_sequence": [
+      "launch (RUNNING)",
+      "independent SSH inspect (RUNNING)",
+      "independent SSH inspect after natural lifetime (EXITED)",
+      "cleanup after natural exit (PASS)"
+    ],
+    "cleanup": {
+      "argv": [
+        "ssh", "-o", "BatchMode=yes", "HF", "--", "ssh", "-o", "BatchMode=yes", "qths1", "--",
+        "/usr/bin/python3", "-B", "/home/user/wy/rdma_dada-multiserver/tests/multiserver_disconnect_probe.py",
+        "cleanup", "--scope-dir", "/home/user/wy/task8c-multiserver-results/ms07b-disconnect-probe-20261015"
+      ],
+      "exit_code": 0,
+      "result": "PASS",
+      "cleanup_utc": "2026-10-15T05:49:07Z",
+      "natural_exit_only": true,
+      "signals_sent": 0,
+      "retention": "retain"
+    },
+    "post_cleanup": {
+      "scope_listing": ["cleanup.json", "scope.json"],
+      "probe_json_present": false,
+      "probe_log_present": false,
+      "pid_present": false,
+      "task_processes": {
+        "rdma2dada": false,
+        "vdif_unpack_worker": false,
+        "pipeline_worker": false,
+        "dada_db": false,
+        "fpga_sender_sim": false
+      },
+      "project_resources_created": false
+    },
+    "remote_resources_created": true,
+    "remote_resource_scope": "one bounded self-invoked probe child and its task-owned scope only; no project dataflow resources"
+  },
+  "prior_local_revision": {
+    "probe_sha256": "5f14e8af5feb8732e47d6444c45bc472bc78b203c2512760d439ce3628c8859d",
+    "unit_test_sha256": "6b01e0957ff8827ba6f41349345829e35e5e1b10e5f750274d3a12d754e19c3b",
+    "remote_attempt_status": "No remote command was executed for that revision"
+  },
+  "intermediate_local_revision": {
+    "probe_sha256": "1405910c42a93d6c6ea156a7b4e51da84c2753be2f72dc7f7b9ddf3ecca5ba78",
+    "unit_test_sha256": "9746190afc0663e5e34a2bfe88c4c305f1b7a4522976379c1f4a80b9a2f9cbcd",
+    "superseded_by": "proc/boot-id and zombie identity-ordering security corrections"
+  },
+  "recommended_environment_decision": "B2 supported for this bounded probe: explicit feature-worktree mirror to the task namespace plus versioned self-invoked child, Linux /proc identity, independent SSH inspect, natural exit and exact cleanup. This does not establish a general detached supervisor or HA guarantee.",
+  "TEST_RESULT": "PASS",
+  "CLEANUP_RESULT": "PASS",
+  "DATAFLOW": "NOT_RUN",
+  "RESULT_NOTIFICATION": "FAIL",
+  "notification": {
+    "target_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+    "attempts": 1,
+    "retry": "NOT_RUN_AFTER_EXPLICIT_STOP_INSTRUCTION",
+    "reason": "callback was previously rejected by the connector; no further callback attempt was made per explicit stop instruction"
+  }
+}

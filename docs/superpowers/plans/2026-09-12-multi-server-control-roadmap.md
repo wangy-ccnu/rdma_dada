@@ -91,161 +91,79 @@ Source/result roots were verified during offline acceptance; runtime and fresh b
 
 Build/runtime disk namespaces do not isolate NIC, CPU, GPU, RAM or shared-memory keys. Before any feature data flow, the testing task checks for paper runs/owned resources, conflicts and aggregate capacity. Defer the feature run if shared hardware is occupied; do not kill or clean another task. Paper supplementary testing has priority. Source sync and runtime resource ownership have separate ledgers.
 
-## 4. Phase 0: evidence gate before remote adapter/test-runner design
+## 4. Environment prerequisites
 
-**Files:** evidence only under a feature-owned location; no product or remote script changes yet.
+Observed host facts are retained in [MS-07b Phase0](../../control/evidence/ms07b-phase0-20261015.json).
+The bounded [disconnect probe](../../control/evidence/ms07b-disconnect-probe-20261015.json)
+established ordinary SSH-request exit survival on qths1; it is not reboot/HA
+acceptance. Tool availability alone does not authorize capability or service changes.
+Refresh only facts required by a changed environment or the next test boundary.
 
-**Interfaces:** an observed host inventory provides exact tools/versions, CPU `(socket,core,logical_cpu)` map, GPU UUID map, NIC/MTU/flow information, installed library resolution, available capacities and permitted execution paths. Absence is explicit, not guessed.
-
-- [x] Hand off a read-only inventory to existing `GPU服务器代码测试`, naming this feature branch/worktree and proposed isolated roots. Dispatched 2026-10-11 from base `78b909e`, targeting HF/qths1 only. No sync/build/rings/data flow authorized by this inventory request; sender-host and Web checks are deferred to their dependent stages.
-- [ ] Verify control host -> processing/sender host connectivity, host-key handling, Python and available libraries, fixed CMake/CTest pair `/home/user/wy/tools/cmake-3.31.12/bin/{cmake,ctest}`, CUDA/PSRDADA/RDMA, permissions, disk/RAM, GPU/CPU topology, NIC/link/MTU and clock state.
-- [ ] Determine whether a persistent host process survives control SSH disconnect under the observed environment. Do not invent `systemd`, `setsid` or passwordless privilege availability.
-- [ ] Record safe control Web exposure: loopback behind an authenticated channel for v1; no unauthenticated externally bound command server. Check time synchronization for scheduled launch separately from data time alignment.
-- [ ] Verify feature namespace isolation and record shared hardware scheduling constraints with paper testing.
-- [ ] Return facts to the development task. If a facility is missing, propose the smallest environment decision; do not install it silently or revert to the paper source/build paths.
-
-Offline configuration/control Phase0 and acceptance are recorded in the stage results. They do not establish live-host supervision, disconnect survival, NIC/clock performance or Web access. Refresh those specific prerequisites before designing the remote adapter and its runner; the unchecked items above concern that upcoming boundary.
-
-2026-10-11 read-only P3 findings are retained in
-[Phase0](../../control/evidence/ms07-phase0-20261011.json) and its
-[supplement](../../control/evidence/ms07-phase0-supplement-20261011.json).
-HF→qths1, Python3.8.10/OpenSSH8.2p1, readable process start identity and CPU/GPU
-mapping are observed. Feature source/results roots and their writable parent
-exist; `multiserver-runs` does not and was not created. qths1 has no task-owned
-dataflow resources. Its user service manager is available with `Linger=no`;
-effective logind session cleanup and disconnect survival are UNKNOWN. Available
-setsid/nohup/systemd-run tools do not resolve those unknowns. Historical binaries
-were inspected for dependencies only, not adopted as feature executables.
-These facts support transport implementation planning; actual stdin protocol,
-process survival, readiness, signals and resource cleanup still need their
-versioned, scoped tests. No service/SSH/NIC settings were changed.
+Before real dataflow, the server owner checks source/binary identity, resource
+availability, receiver/sender connectivity and the installed PSRDADA ABI. The
+registered read-only ABI gate has passed in the no-dataflow stage. Any temporary
+CAP_NET_RAW grant still needs permission. Web access remains a later prerequisite:
+loopback behind an authenticated channel, not an exposed command service.
 
 ## 5. Implementation work packages
 
 ### P1 — Global configuration and portable bundles
 
-Accepted MS-01–05, committed through82ac66f. See
-[configuration interfaces and reproduction](../../control/configuration.md),
-[MS-01/02 acceptance](../../control/ms01-ms02-acceptance.md) and
-[MS-03–05 acceptance](../../control/ms03-ms05-acceptance.md).
-Portable per-GPU bundles resolve through the unchanged single-instance compiler.
-Static validation is not live resource readiness; no remote execution is implemented.
+MS-01–05 accepted. Contracts and reproduction are maintained in
+[configuration](../../control/configuration.md), with
+[MS-01/02](../../control/ms01-ms02-acceptance.md) and
+[MS-03–05](../../control/ms03-ms05-acceptance.md) evidence.
+This accepts static configuration, not live resource readiness.
 
-### P2 — Control protocol and lifecycle, using fake hosts first
+### P2 — Control protocol and lifecycle
 
-Accepted MS-06 offline control on2026-10-11; six Linux suites x3 PASS, no actual
-host/dataflow claim. See [lifecycle API and host contract](../../control/lifecycle.md)
-and [MS-06 acceptance](../../control/ms06-acceptance.md).
-Store/controller/schema and fake-host tests are implemented. Public requests
-target the observation; durable intents and reconciliation guard uncertain actions.
-No production SSH adapter, automatic restart, resume-start API or HA guarantee.
+MS-06 offline control accepted. Store/controller semantics, idempotent commands,
+local-failure policy and reconciliation are maintained in
+[lifecycle](../../control/lifecycle.md) and [acceptance](../../control/ms06-acceptance.md).
+No automatic restart or HA guarantee is introduced.
 
-### P3 — Isolated host supervisor and transport
+### P3 — Host supervision, transport and pipeline integration
 
-**Create after Phase 0:** `scripts/multiserver/transport.py`, `host_agent.py`, `ownership.py`, `scripts/multiserver_host.py`; `tests/multiserver_host_test.py`, `tests/multiserver_transport_test.py`.
+MS-07a SSH transport is accepted; see the [server result](../../control/evidence/ms07a-acceptance-20261011.json)
+and [audit](../../control/evidence/ms07a-acceptance-audit-20261011.json).
+B1–C1 and I1 implementation/review are complete. The user accepted the
+[server build and no-dataflow gates](../../control/evidence/ms07bc-build-gates-20261015.json)
+on 2026-10-15. This is not actual multi-instance dataflow acceptance.
 
-**Potential product edits, only if required by verified lifecycle behavior:** `apps/rdma2dada/main.cpp`, `apps/vdif_unpack_worker/main.cpp`, `apps/pipeline_worker/main.cpp`; dedicated tests under `tests/` and feature-only CMake changes. Do not claim CLI flags already exist.
+#### MS-07b/c delivery batch — split first, accept together (2026-10-15)
 
-**Interface:** host command protocol from P2, checked bundle directory from P1, observed inventory from Phase 0. Persist exact owned PIDs plus process start identity/process group, IPC keys and path identities per run. A reused PID is not proof of ownership.
+| Package | Delivered responsibility |
+|---|---|
+| B1 | Host-local resource claims and action journal |
+| B2 | Retained process identity, inspection, bounded wait and owned signalling |
+| B3 | Durable host command entrypoint and detached supervisor |
+| C1 | Compiler/runtime integration, optional readiness/result hooks and scoped cleanup |
+| I1 | Versioned functional runner, fixed peer fixture and evidence validation |
 
-Local interface inspection at `78b909e` (2026-10-11) identifies these adapter
-constraints, not live-host acceptance:
+Task IDs, retained checkouts and acceptance scope are maintained in the
+[ledger](../../control/task-ledger.md). Internal/public interfaces and runner
+invocation are maintained in [lifecycle](../../control/lifecycle.md).
+Keep these contracts in one place rather than repeating implementation instructions.
+No RDMA/unpack/GPU algorithm or layout change is part of this stage.
 
-- `vdif_unpack_worker --ready-file` publishes preparation evidence before the
-  input read lock/header arrives; this is not first-block or output evidence.
-- `rdma2dada` exposes startup log messages but no machine-readable ready-file
-  argument. Its SIGINT/SIGTERM path stops the receiver and then emits raw EOD.
-- `pipeline_worker` exposes resolved-plan and final-metrics arguments, but no
-  explicit pre-header readiness snapshot. CUDA ring-registration log output
-  alone does not prove algorithm initialization, which occurs in transfer open.
-- Unpack/GPU signal handlers set a stop flag checked around the read loop;
-  bounded exit from a blocked PSRDADA call is unproven. Normal drain must stop
-  ingress first; force cleanup needs independently verified resource ownership.
+Remaining P3 functional work, through the existing GPU-server test owner:
 
-Keep readiness distinct from transfer-open/completed evidence. Decide the
-smallest optional runtime hooks after Phase 0; do not transplant the performance
-runner's sleep/PID/log checks as a production readiness contract.
+- [ ] Resolve required dataflow permissions; preinstall trusted bundles, fixed future
+  UTC schedules and immutable per-host deployments. No preparation traffic.
+- [ ] Run single-instance and same-host two-GPU equal/+1-channel cases, all-ready
+  gating, prepare rollback, finite EOD, graceful/forced manual stop, isolated
+  runtime failure with healthy peer continuing, and disconnect/reconnect.
+- [ ] Require three clean repetitions per case, actual sender/receiver/unpack/GPU/
+  output/EOD accounting and exact process/IPC cleanup. Deterministic fault evidence
+  must identify the intended instance; wrong-target failure is not a passing case.
+- [ ] Record unavailable physical cross-host receiver coverage as a limitation;
+  same-host two-GPU success cannot substitute for it.
+- [ ] Coordinator reviews the real functional results, updates existing status/
+  evidence and confirms final batch acceptance before child archive decisions.
 
-- [ ] Generate process argv from explicit binary/profile inputs; no shell interpolation or arbitrary user command strings. Host-local compiler resolves bundles from their final path before ring allocation.
-- [ ] Use an exact-key resource claim before create; refuse foreign IPC instead of deleting it. Validate CPU logical and physical-core overlap and available GPU ownership at runtime, not only offline.
-- [ ] Prepare in reverse-consumer dependency order (rings, output consumer, GPU, unpack, receiver) using observed readiness, not sleep-only success. Mark ready only when required processes and interfaces are verified, even before a data header has arrived.
-- [ ] Implement run-scoped drain and forced cleanup. Stop ingress first and allow downstream EOD to finish; do not broadcast SIGTERM to every stage at once and discard buffered data. Normal finite finish, input silence and missing Station behavior must remain truthful.
-- [ ] Prove the host supervisor remains alive when the control connection drops and reports/reconciles state on reconnect. Test timeouts without touching an unknown run.
-- [ ] Run fake-process ownership/error tests, then an authorized small functional server gate. Any product stop/readiness changes require affected existing correctness/Full regression on the feature build; they are not automatically backported to the paper branch.
-
-#### MS-07a — First independently testable slice: SSH command transport
-
-Plan approved and transport-only acceptance completed on 2026-10-11.
-See [server evidence](../../control/evidence/ms07a-acceptance-20261011.json) and
-[coordinator audit](../../control/evidence/ms07a-acceptance-audit-20261011.json).
-Preserve the
-approved execution method: one persistent gpt-6.1-sol/high task, coordinator
-review, then the existing GPU-server test owner. No automatic Git operations.
-
-**Files:** create `scripts/multiserver/transport.py` and
-`tests/multiserver_transport_test.py`; register the test in `CMakeLists.txt`;
-extend `docs/control/lifecycle.md` with the accepted transport contract.
-Do not edit controller/store behavior, processing binaries or the paper runner.
-
-**Interfaces:** `SSHHostAdapter(endpoints, *, ssh_path, timeout_seconds)`
-accepts a per-command timeout in `(0, 3600]` seconds, not an observation duration;
-implements the existing `send(instance_key, command) -> dict`. Endpoints are a
-trusted deployment mapping keyed by server ID, containing `ssh_host`, absolute
-`python_path`, absolute `host_entrypoint`, and absolute `known_hosts_file` on
-the control host. They are not executable arguments supplied in an observation
-or Web request. Validate instance/command server and GPU identity before launch.
-The host entrypoint is a future dependency; tests use a dedicated fixture and
-must not advertise the production supervisor as implemented.
-
-**Transport decision:** run from HF directly to qths1; one noninteractive SSH
-request, no nested SSH in the adapter, no third-party SSH package. Send the
-command as finite, strict UTF-8 JSON on stdin, never as shell text. SSH still
-uses a remote shell: quote only the trusted fixed Python/entrypoint argv using
-`shlex.quote`, and keep all runtime payload fields off that command line.
-Use `-T`, `BatchMode=yes`, `StrictHostKeyChecking=yes`, explicit known-hosts
-and bounded connection/request timeouts. Do not enroll keys or change SSH config.
-
-**Failure contract:** one dispatch only, no automatic retry. Timeout raises
-`TimeoutError`; SSH/connection/nonzero-exit failures raise `OSError`, preserving
-MS-06's durable UNKNOWN outcome. Malformed, duplicate-key, nonfinite or
-non-object responses raise a transport protocol `ValueError`; the controller
-retains its recorded uncertainty. Response identity/state validation stays with
-MS-06 rather than duplicating its state machine. Bound each output stream to
-1 MiB while reading, not after unbounded `communicate()` allocation. Reject an
-oversized request before spawn. On local timeout/overflow, reap the SSH child;
-never claim the remote action was cancelled or issue a remote cleanup command.
-
-**Review focus:** shell metacharacters/Unicode in JSON remain data; unknown
-targets cannot create an SSH process; delayed or lost replies never replay an
-action; noisy/truncated output cannot exhaust memory or become a valid report;
-transport failure leaves durable controller uncertainty rather than a false stop.
-
-- [x] Add failing unittest cases for exact fixed SSH argv/stdin bytes, successful
-  report round-trip, identity mismatch before spawn, invalid endpoint/path,
-  strict JSON decoding, stdout/stderr limits, timeout/child reaping, exit255,
-  and zero implicit retry. Include a real local fixture subprocess, not mocks
-  alone, for timeout/output-bound behavior.
-- [x] Implement the minimal standard-library adapter with Python3.8-compatible
-  syntax. Test limits without logging full command payloads or credentials.
-- [x] Add controller integration cases showing a timeout retains pending action
-  identity and reconcile does not replay prepare/start. Run
-  `python3 -B -m unittest discover -s tests -p multiserver_transport_test.py -v`
-  and the existing `multiserver_controller_test.py`/`multiserver_store_test.py`.
-  Register `multiserver_transport_test`; PASS requires all tests exit0 with no
-  leftover fixture processes. This is local evidence only.
-- [x] Coordinator reviews diff and failure paths; freeze source identity only
-  at handoff. Test owner runs the affected registered Linux tests x3 and one
-  versioned read-only HF→qths1 fixture round-trip/failure test. Its fixture
-  exchanges JSON only: no host state, service, rings, GPU or observation start.
-  Preserve commands/results/cleanup in the feature evidence namespace.
-- [x] Record transport-only acceptance and leave commit to the user.
-- [ ] Plan
-  MS-07b process ownership/supervisor against the accepted adapter and observed
-  logind/session behavior; keep system configuration changes separately approved.
-
-MS-07b owns detached supervision, durable host action outcomes and resource
-claims; MS-07c owns actual binary readiness/drain integration. Neither is covered
-by an MS-07a PASS. Live data rates and data-time snapshots remain P4.
+No new throughput/saturation campaign, arbitrary remote command execution or
+production fault-injection interface is included. Stop only dependent blocked
+work; preserve unrelated paper runs and resources.
 
 ### P4 — Live business snapshots
 
@@ -274,16 +192,19 @@ by an MS-07a PASS. Live data rates and data-time snapshots remain P4.
 - [ ] UI shows server/GPU/frequency, actual and expected receive/output rates, data end time, relative progress, missing/zero-filled count and status age. Use integer sample positions/time strings to avoid JavaScript 53-bit truncation of timestamps/counters.
 - [ ] Polling is sufficient for v1; no custom streaming transport, frontend build framework or interactive schema editor required for the first functional deliverable.
 
-### P6 — Functional acceptance and documentation
+### P6 — Final functional acceptance and documentation
 
-**Create after Phase 0 and P3:** `scripts/multiserver_acceptance.py`, `config/testing/multiserver-functional-suite.json`, `tests/multiserver_acceptance_test.py`. Extend existing configuration/lifecycle guides and add one final acceptance record linked by the ledger; do not duplicate them with parallel usage/status documents.
+Reuse the implemented `scripts/multiserver_acceptance.py`, its fixed peer and
+tests. P3 owns the pending runtime matrix above; do not build a second runner or
+repeat unchanged cases just because UI/telemetry is added.
 
-- [ ] Runner owns exact resources and records full configuration/identity, every repetition, first failure, cleanup and notifications. Do not modify the paper runner merely to add a production-control feature.
-- [ ] Exercise same-host two-instance resource isolation with fake inventory locally; actual multi-GPU server run only when CPU/GPU/NIC resources permit. No fake multi-host performance claim if only one receiving host is available.
-- [ ] Server functional acceptance: three consecutive clean runs for equal and one-extra-channel assignments, scheduled start/finite finish, manual stop, partial-start failure, one-instance runtime failure, control disconnect/reconnect and snapshot accuracy. Fault injection affects only explicitly owned instances.
-- [ ] Simulator configs are generated per destination from the same allocation; retain samples/packet and recompute packet bytes. Protect fixed paper source ports and CPU profiles; feature endpoints are explicitly recorded.
-- [ ] Preserve compact feature evidence, including failures, in the isolated result root. Document that this is functional acceptance, not a substitute for the established paper performance suites.
-- [ ] Only after passed server handoff and user approval propose commit group 7. No automatic merge or push.
+- [ ] After P4/P5, extend only affected cases to verify snapshot accuracy and
+  equivalent CLI/Web behaviour, using actual resource ownership and data closure.
+- [ ] Preserve one compact feature result per stage and necessary raw evidence in
+  the isolated namespace. Update configuration/lifecycle guides and the ledger,
+  not parallel status reports. These are not paper throughput results.
+- [ ] Declare unavailable topology/permissions explicitly. After server acceptance,
+  propose user-controlled commit/push; no automatic merge into the paper branch.
 
 ## 6. Acceptance gates and stopping rules
 

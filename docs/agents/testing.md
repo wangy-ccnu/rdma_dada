@@ -64,7 +64,9 @@ CTest 未注册、目标未构建、缺少参数或 skip 不能报 PASS。统计
 - 输出进度以按序发布到 output ring 为边界；当前关闭落盘，以 dbnull 验证 EOD。
 
 真实数据流验收还要按实例核对 sender/receiver/unpack/GPU/output 的包、block 和字节。
-若有 preparation 数据，分别记录并核对 preparation 与正式窗口，不能直接比较不同窗口计数。
+用户于 2026-10-15 确认：本轮及后续测试默认无 preparation 数据段，只发送正式观测
+窗口的数据。程序预启动、全部实例就绪检查和共同 UTC 开始时间仍保留；它们不是预备数据。
+历史工件保留当时的 preparation 配置和计数，不改写，也不因此重跑。
 完整、partial tail、缺包补零、重复/迟到、错误 header 和正常结束均须有明确期望。
 已配置 Station 的缺席不能静默变成更小阵列；实例故障不扩大为停止健康频段的默认策略。
 
@@ -72,8 +74,8 @@ CTest 未注册、目标未构建、缺少参数或 skip 不能报 PASS。统计
 
 - 控制 host 按部署清单分别连接目标。现有测试拓扑由 HF 编排，不让 qths1 反向 SSH sender。
 - 使用 argv 或版本化脚本，避免嵌套 SSH shell 展开；host-key 文件限定到本次任务。
-- 资源创建前验证配置、二进制、网络 endpoint、能力和就绪条件；准备延时沿用选定
-  基线，未特别说明时 unpack preparation 为 1 秒。多实例 CPU/NUMA/端口由部署输入决定，
+- 资源创建前验证配置、二进制、网络 endpoint、能力和就绪条件；数据窗口遵循上述
+  无 preparation 规则。多实例 CPU/NUMA/端口由部署输入决定，
   不把某台机器的固定核号当产品默认值。
 - 每个进程保存真正子进程 PID/PGID、argv、环境、退出状态；wrapper 必须转发停止信号。
   后台子进程不能意外持有 SSH stdout/stderr 导致启动互等。

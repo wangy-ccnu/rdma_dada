@@ -3,6 +3,7 @@ import json
 import math
 import os
 import pathlib
+import shlex
 import subprocess
 import sys
 import time
@@ -88,6 +89,27 @@ class SSHTransportTest(unittest.TestCase):
     def test_report_roundtrip_preserves_unicode_and_metacharacters_as_data(self):
         text = '汉字😀; `cmd` $HOME $(exit 3) | & > " \\ \n'
         self.assertEqual(self.send(text=text), dict(COMMAND, probe_mode='echo', text=text))
+
+    def test_host_deployment_path_is_trusted_quoted_and_not_request_selected(self):
+        path = "/trusted/host's config;$(never).json"
+        endpoint = dict(ENDPOINT, deployment_path=path)
+        adapter = SSHHostAdapter({'node-a': endpoint}, ssh_path='/usr/bin/ssh', timeout_seconds=2)
+        endpoint['deployment_path'] = '/changed.json'
+        command = dict(COMMAND, deployment_path='/untrusted.json')
+        with mock.patch('scripts.multiserver.transport.subprocess.Popen',
+                        side_effect=self.launch_local_peer):
+            self.assertEqual(adapter.send(('node-a', 0), command), command)
+        self.assertEqual(shlex.split(self.calls[0][0][-1]),
+                         ['/usr/bin/python3', '-B', ENDPOINT['host_entrypoint'],
+                          '--deployment', path])
+
+    def test_invalid_host_deployment_path_rejected_before_launch(self):
+        with mock.patch('scripts.multiserver.transport.subprocess.Popen') as launch:
+            for path in (None, '', 'relative.json', '/bad\x00', '/bad\n', '/bad\ud800'):
+                with self.subTest(path=repr(path)), self.assertRaises(ValueError):
+                    SSHHostAdapter({'node-a': dict(ENDPOINT, deployment_path=path)},
+                                   ssh_path='/usr/bin/ssh', timeout_seconds=2)
+            launch.assert_not_called()
 
     def test_invalid_identity_does_not_spawn(self):
         cases = [(('missing', 0), COMMAND), (('node-a', True), COMMAND),

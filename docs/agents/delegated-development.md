@@ -125,6 +125,14 @@ Routine code review, reproducible tests and contained fixes remain the coordinat
 
 After the coordinator explicitly confirms acceptance and required human sign-off is complete, send that result to the child conversation. The child then decides whether it can archive itself and reports its reason/status.
 
+Trigger this archive check in the same coordination flow as acceptance; do not
+wait for the user to remind you. Evaluate the child's bounded deliverable, not
+completion of the entire project. Later integration/testing may transfer explicitly
+to the coordinator and server-test owner without being labelled completed.
+"May need follow-up later" alone is not a reason to keep an accepted child open:
+record the follow-up owner and retained evidence, then archive the conversation.
+KEEP_OPEN must name a concrete task still assigned to that child.
+
 Archive only when all of the following hold:
 
 - The bounded task is accepted, with no pending correction, remote test, human review or active operation.

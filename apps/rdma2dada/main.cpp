@@ -1,3 +1,4 @@
+#include "rdma_dada/control/lifecycle_json.h"
 // rdma2dada composition root: one RAW_PACKET QP -> PSRDADA raw ring.
 #include <errno.h>
 #include <getopt.h>
@@ -12,6 +13,7 @@
 #include <unistd.h>
 
 #include <climits>
+#include <sstream>
 #include <string>
 
 #include "rdma_dada/config/observation_artifacts.h"
@@ -27,7 +29,12 @@ volatile sig_atomic_t g_thread_exit = 0;
 bool g_debug_mode = false;
 std::uint64_t g_record_bytes = 0;
 std::uint64_t g_committed_blocks = 0;
+std::uint64_t g_committed_bytes = 0;
 std::uint64_t g_last_status_ns = 0;
+std::string g_ready_path;
+std::string g_result_path;
+
+using rdma_dada::control::PublishLifecycleJson;
 
 std::uint64_t MonotonicRawNs() {
     struct timespec value = {};
@@ -71,6 +78,7 @@ int CommitRawBlock(std::uint64_t token, std::uint64_t valid_bytes) {
     }
     if (g_ringbuf->CommitWriteBlock(token, valid_bytes) != 0) return -1;
     ++g_committed_blocks;
+    g_committed_bytes += valid_bytes;
     const std::uint64_t now_ns = MonotonicRawNs();
     if (rdma_dada::io::rdma::ShouldEmitPeriodicReceiveStatus(g_debug_mode) &&
         (g_last_status_ns == 0U || now_ns - g_last_status_ns >=
@@ -102,6 +110,8 @@ void PrintHelp() {
     printf("  --poll-cpu CPU    direct receive thread CPU (default: unbound)\n");
     printf("  --debug           enable periodic ring status\n");
     printf("  --preflight-only  validate direct receive geometry only\n");
+    printf("  --ready-file PATH publish receiver readiness atomically\n");
+    printf("  --result-json PATH publish final counters/EOD atomically\n");
     printf("  --help, -h\n");
     printf("Fixed direct path: one destination flow, one QP/CQ/thread, "
            "NSGE=2, 42-byte header scratch, two outstanding ring blocks.\n");
@@ -117,6 +127,8 @@ int ParseArgs(RoCEv2Dada::RdmaParam *param, char *plan_path,
         {"debug", no_argument, NULL, 271},
         {"plan", required_argument, NULL, 273},
         {"preflight-only", no_argument, NULL, 274},
+        {"ready-file", required_argument, NULL, 278},
+        {"result-json", required_argument, NULL, 279},
         {"help", no_argument, NULL, 'h'},
         {0, 0, 0, 0}
     };
@@ -145,6 +157,14 @@ int ParseArgs(RoCEv2Dada::RdmaParam *param, char *plan_path,
                 plan_path[plan_path_size - 1U] = '\0';
                 break;
             case 274: *preflight_only = true; break;
+            case 278:
+                if (!g_ready_path.empty() || optarg[0] == '\0') return -1;
+                g_ready_path = optarg;
+                break;
+            case 279:
+                if (!g_result_path.empty() || optarg[0] == '\0') return -1;
+                g_result_path = optarg;
+                break;
             case 'h': PrintHelp(); return -1;
             case -1:
                 if (optind != argc || explicit_poll_cpu < -1) {
@@ -292,14 +312,34 @@ int main(int argc, char **argv) {
     printf("RDMA receiver running\nListening on: %s:%s (%s)\n",
            param.DAddr, param.dst_port, param.DMacAddr);
     fflush(stdout);
-    while (!g_thread_exit) sleep(1);
+    std::ostringstream ready;
+    ready << "{\"schema_version\":1,\"pid\":" << getpid()
+          << ",\"config_id\":\"" << resolved_plan.config_id
+          << "\",\"geometry_id\":\"" << resolved_plan.geometry_id
+          << "\",\"input_key\":" << resolved_plan.source.raw_key << "}\n";
+    const bool ready_ok = PublishLifecycleJson(g_ready_path, ready.str());
+    if (!ready_ok) fprintf(stderr, "Error: cannot publish lifecycle ready file\n");
+    while (ready_ok && !g_thread_exit) sleep(1);
 
     const int stop_result = receiver->Stop();
     delete receiver;
     const int eod_result = g_ringbuf->SendEODAndDisconnect();
     delete g_ringbuf;
     g_ringbuf = NULL;
-    if (stop_result != 0 || eod_result != 0) return -1;
+    std::ostringstream final_result;
+    final_result << "{\"schema_version\":1,\"pid\":" << getpid()
+        << ",\"config_id\":\"" << resolved_plan.config_id
+        << "\",\"geometry_id\":\"" << resolved_plan.geometry_id
+        << "\",\"input_key\":" << resolved_plan.source.raw_key
+        << ",\"ok\":" << (ready_ok && stop_result == 0 && eod_result == 0 ? "true" : "false")
+        << ",\"committed_bytes\":" << g_committed_bytes
+        << ",\"committed_blocks\":" << g_committed_blocks
+        << ",\"eod\":" << (eod_result == 0 ? "true" : "false") << "}\n";
+    if (!PublishLifecycleJson(g_result_path, final_result.str())) {
+        fprintf(stderr, "Error: cannot publish lifecycle result file\n");
+        return -1;
+    }
+    if (!ready_ok || stop_result != 0 || eod_result != 0) return -1;
     printf("[Main] Writer shutdown complete\n");
     return 0;
 }

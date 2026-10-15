@@ -141,6 +141,46 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(record["stderr"], "bad geometry\n")
         self.assertEqual(record["compiler"]["sha256"], sha(self.compiler))
 
+    def test_bounded_runner_timeout_keeps_first_error_partial_output_and_identity(self):
+        process=dict(state='EXITED',returncode=-9,identity=dict(pid=123,role='compiler'),
+                     logs=dict(stdout='/owned/stdout.log',stderr='/owned/stderr.log'))
+        def run_compiler(argv):
+            error=subprocess.TimeoutExpired(argv,.1,output=b'partial out\n',stderr=b'partial err\n')
+            error.compiler_process=process
+            error.output_truncated=dict(stdout=False,stderr=False)
+            raise error
+        with self.assertRaisesRegex(ValueError,'COMPILER_TIMEOUT') as caught:
+            resolve_instance(self.instance,self.compiler,self.output,run_compiler=run_compiler)
+        details=caught.exception.details
+        self.assertEqual(details['error']['code'],'COMPILER_TIMEOUT')
+        self.assertEqual(details['timeout_seconds'],.1)
+        self.assertEqual(details['stdout'],'partial out\n')
+        self.assertEqual(details['stderr'],'partial err\n')
+        self.assertEqual(details['compiler_process'],process)
+        self.assertEqual(details['returncode'],-9)
+        self.assertFalse(self.output.exists())
+        record=json.loads((Path(details['evidence_directory'])/'resolution.json').read_text())
+        self.assertEqual(record['error']['code'],'COMPILER_TIMEOUT')
+        self.assertEqual(record['compiler_process'],process)
+
+    def test_truncated_success_report_cannot_publish_valid_prefix_only(self):
+        def run_compiler(argv):
+            self.invalid_artifact_result(argv)
+            directory=Path(argv[-1])
+            (directory/'raw.header').write_bytes(b'\0'*4096)
+            report=self.valid_report()
+            report.update(observation_id=self.plan['observation_id'],inputs=dict(
+                observation=str(self.instance/'observation.json'),wire_profile=str(self.instance/'wire-profile.json')))
+            (directory/'validation_report.json').write_text(json.dumps(report))
+            (directory/'MANIFEST.sha256').write_text(''.join(sha(path)+'  '+path.name+'\n'
+                for path in sorted(directory.iterdir()) if path.name!='MANIFEST.sha256'))
+            completed=subprocess.CompletedProcess(argv,0,json.dumps(report),'')
+            completed.output_truncated=dict(stdout=True,stderr=False)
+            return completed
+        with self.assertRaisesRegex(ValueError,'COMPILER_OUTPUT_LIMIT'):
+            resolve_instance(self.instance,self.compiler,self.output,run_compiler=run_compiler)
+        self.assertFalse(self.output.exists())
+
     def test_launch_failure_is_structured(self):
         error = self.reject("COMPILER_LAUNCH", side_effect=OSError("exec format error"))
         self.assertIsNone(error.details["returncode"])

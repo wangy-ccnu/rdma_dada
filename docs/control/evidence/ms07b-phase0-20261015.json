@@ -1,0 +1,159 @@
+{
+  "task": "MS-07b/c Phase0 read-only host supervision supplement",
+  "date": "2026-10-15",
+  "coordinator_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+  "source_worktree": "/Users/ywang/WorkFile/code/rdma_dada/.worktrees/multi-server-observation",
+  "scope": "read-only only; no sync, build, test, probe, supervisor, ring, sender, GPU dataflow, or system configuration change",
+  "connectivity": {
+    "hf": {"argv": ["ssh", "-o", "BatchMode=yes", "HF", "/bin/hostname"], "exit_code": 0, "hostname": "qtrelay0"},
+    "hf_to_qths1": {"argv": ["ssh", "HF", "--", "ssh", "-o", "BatchMode=yes", "qths1", "--", "/bin/hostname"], "exit_code": 0, "hostname": "qths1"}
+  },
+  "runtime_tools": {
+    "hf": {"python": "Python 3.8.10", "setsid": "util-linux 2.34", "nohup": "GNU coreutils 8.30", "systemd_run": "systemd 245 (245.4-4ubuntu3.24)"},
+    "qths1": {"python": "Python 3.8.10", "setsid": "util-linux 2.34", "nohup": "GNU coreutils 8.30", "systemd_run": "systemd 245 (245.4-4ubuntu3.24)"}
+  },
+  "user_session": {
+    "hf": {"systemctl_user_is_system_running": "running", "loginctl": ["RuntimePath=/run/user/1000", "State=active", "Linger=no"], "runtime_mode": "0700 user:user"},
+    "qths1": {"systemctl_user_is_system_running": "running", "loginctl": ["RuntimePath=/run/user/1000", "State=active", "Linger=no"], "runtime_mode": "0700 user:user"},
+    "user_service_inventory": "HF has active GNOME/session user services; qths1 has dbus/pulseaudio and session services. No task supervisor unit was present or created."
+  },
+  "process_identity": {
+    "hf_init": "PID1 /sbin/init, PPID0, PGID1, SID1, root",
+    "qths_init": "PID1 /sbin/init, PPID0, PGID1, SID1, root",
+    "ssh_sessions": "sshd user@notty children are separate sessions/PGIDs; this is observation only",
+    "disconnect_survival": "UNKNOWN; no background probe or disconnect experiment was started",
+    "available_identity_fields": ["PID", "PPID", "PGID", "SID", "UID", "start time", "elapsed", "argv", "cgroup"]
+  },
+  "feature_namespace": {
+    "hf_source": "/home/user/wy/rdma_dada-multiserver owner=user:user mode=755",
+    "qths_source": "/home/user/wy/rdma_dada-multiserver owner=user:user mode=755",
+    "hf_runtime_root": "ABSENT; stat exit 1",
+    "qths_runtime_root": "ABSENT; stat exit 1",
+    "hf_results": "/home/user/wy/task8c-multiserver-results owner=user:user mode=775",
+    "qths_results": "/home/user/wy/task8c-multiserver-results owner=user:user mode=775"
+  },
+  "capacity_and_residue": {
+    "hf": {"disk_available_1024_blocks": 421008840, "memory_available_bytes": 11892129792},
+    "qths1": {"disk_available_1024_blocks": 776428444, "memory_available_bytes": 131421913088, "gpu": "2x RTX3090, 24576 MiB each, 15 MiB used each", "gpu_compute_apps": "empty", "task_processes": "none for rdma2dada/vdif_unpack_worker/pipeline_worker/dada_db/fpga_sender_sim", "semaphores": "empty", "shared_memory": "only pre-existing gdm shmid 2 and 5; untouched"}
+  },
+  "command_issues": [
+    {"argv": "nested python3 -c with semicolons/object braces", "status": "HARNESS_QUOTING", "detail": "remote shell parsed the code; no mutation occurred; process identity was refreshed with fixed ps/proc argv instead"},
+    {"argv": "pgrep -af 'rdma2dada|...|...'", "status": "HARNESS_QUOTING", "detail": "remote shell interpreted pipe characters; retried as five independent fixed pgrep argv, all exit 1"}
+  ],
+  "c1_resource_identity": {
+    "observed_utc": "2026-10-15T14:02:00+08:00",
+    "source_evidence": [
+      "/home/user/psrdada/src/dada_hdu.c",
+      "/home/user/psrdada/src/ipcbuf.c",
+      "/home/user/psrdada/apps/dada_db.c",
+      "/proc/sysvipc/shm",
+      "/proc/sysvipc/sem",
+      "/home/user/psrdada/bin/dada_db -h"
+    ],
+    "key_rules": {
+      "dada_hdu_set_key": "data_block_key=K; header_block_key=K+1",
+      "ipcbuf_create_internal": "sync metadata is created at K; key_increment is 0x00010000; then semkey_connect=K+0x10000; each reader semkey_data increments by 0x10000; each data-buffer shmkey increments by 0x10000",
+      "implication": "a ring footprint is a deterministic family of SysV keys only after the exact K, nbufs and nreaders are known; no +1-only inference is used for the data/semaphore family"
+    },
+    "metadata_visibility": {
+      "proc_sysvipc_shm": "readable; fields observed: key, shmid, perms, size, cpid, lpid, nattch, uid/gid/cuid/cgid, atime/dtime/ctime, rss/swap",
+      "proc_sysvipc_sem": "readable; fields observed: key, semid, perms, nsems, uid/gid/cuid/cgid, otime/ctime",
+      "creator_proof": "cpid/cuid and timestamps are available, but /proc/sysvipc alone does not identify the creating command/argv; task ownership requires matching live/dead PID identity plus recorded task ledger/config, not IPCKEY alone"
+    },
+    "destroy_semantics": {
+      "dada_db": "-d selects destroy mode; source reconnects data K and header K+1, then ipcbuf_destroy each",
+      "ipcbuf_destroy": "IPC_RMID is issued for connect/data semaphores and every buffer/sync shm segment; detach is attempted before shm IPC_RMID",
+      "persistence": "-w/persist waits for signal before destroy; no signal was sent in this Phase0",
+      "safe_cleanup_boundary": "only exact task-owned K plus derived family, with verified owner/cpid/geometry and retained ledger, is eligible; unknown or key-only matches are not eligible"
+    },
+    "create_flags_and_partial_failure": {
+      "default_flags": "IPCUTIL_DEFAULT_CREATE_FLAGS = IPCUTIL_PERM | IPC_CREAT | IPC_EXCL, with IPCUTIL_PERM=0666",
+      "existing_key_behavior": "creation is exclusive; an existing sync/semaphore/shm key causes the corresponding create call to fail rather than attach",
+      "partial_data_ring": "ipcbuf_create_work_internal creates sync metadata, semaphores and data buffers incrementally; ipcbuf_get records failures and returns -1, but the observed function has no rollback call before returning",
+      "data_then_header": "dada_db returns immediately if data-ring creation fails; if data creation succeeds but header creation fails, the source returns immediately without calling ipcbuf_destroy on the already-created data ring",
+      "race_safety": "preflight emptiness is not an exclusivity proof: a concurrent creator can win after inspection, and a failed partial create may leave task-unknown IPC objects; cleanup must use creator/ledger/geometry identity and never broad key deletion"
+    },
+    "current_inventory": {
+      "shm": "only pre-existing unrelated gdm shmid 2 and 5; untouched",
+      "sem": "empty",
+      "task_rings": "none observed",
+      "experiment_started": false
+    },
+    "conclusion": "C1 can prove and later clean a task-owned ring footprint only when the runner records exact K/geometry and owner PID identity, then reconciles the derived shm/sem family against /proc/sysvipc. IPCKEY matching by itself is insufficient creator/ownership evidence."
+  },
+  "i1_rdma_capability_and_layout": {
+    "observed_utc": "2026-10-15T14:10:00+08:00",
+    "rdma_source": {"raw_qp": "/home/user/wy/rdma_dada-multiserver/src/io/rdma/verbs_context.cpp:37 uses IBV_QPT_RAW_PACKET", "create_call": "/home/user/wy/rdma_dada-multiserver/src/io/rdma/verbs_context.cpp:38 calls ibv_create_qp", "cap_net_raw_source_reference": "none found in synchronized include/src/apps"},
+    "binary_capabilities": {"getcap_path": "/usr/sbin/getcap", "setcap_path": "/usr/sbin/setcap", "rdma2dada_file_capabilities": "empty", "qths_effective_caps": "CapEff=0000000000000000; CapPrm=0000000000000000; CapAmb=0000000000000000", "bounding_set": "includes cap_net_raw but this is not an effective grant", "sudo_n": "NOPASSWD: ALL for user user; not invoked for setcap and no system change made"},
+    "permission_conclusion": "No file capability or effective CAP_NET_RAW is currently granted to the ordinary user/binary. The source uses RDMA verbs RAW_PACKET QP; whether the local verbs provider additionally requires CAP_NET_RAW cannot be proven from this source-only read. Any future capability decision must be an explicit environment change; none was made here.",
+    "psrdada_layout": {"header_constant": "IPCBUF_MAX_READERS is absent from the installed header", "readers_constant": "IPCBUF_READERS=8 (maximum readers)", "transfers_constant": "IPCBUF_XFERS=8", "sizeof_ipcsync": "not exported or recorded by the existing build; source allocation formula is sizeof(ipcsync_t) + nbufs + sizeof(key_t)*nbufs", "struct_source": "/home/user/psrdada/include/ipcbuf.h: ipcsync_t contains sem keys, ring geometry, reader state, 8 transfer arrays and on_device_id"},
+    "dada_db_semantics": {"numa": "-c node is supported; source initializes numa_node=-1, so default is all nodes", "default_create": "source defaults destroy=0, lock=0, persist=0, readers=1; -p and -w are opt-in", "help": "-c assigns NUMA node; -p pages buffers into RAM; -w waits for signal before destroying"},
+    "dataflow_started": false,
+    "cleanup": "NOT_APPLICABLE; read-only only"
+  },
+  "qtp_sender_environment_supplement": {
+    "observed_utc": "2026-10-15T13:56:26+08:00",
+    "hosts": {
+      "qtpulsar1": {
+        "hostname": "qtpulsar1",
+        "python": "/usr/bin/python3 Python 3.8.10",
+        "cpu_count": 24,
+        "memory_total_bytes": 67142316032,
+        "memory_available_bytes": 46502809600,
+        "disk_available_1024_blocks": 745378684,
+        "interfaces": {"ens2np0": {"state": "UP", "mtu": 9000, "speed_mbps": 100000, "duplex": "Full", "link_detected": true}, "enp4s0": {"state": "UP"}, "enp5s0": {"state": "DOWN", "carrier": false}},
+        "sender_binary": {"path": "/home/user/wy/build-sender-staged-ablation-20260829/fpga_sender_sim", "sha256": "c804811ccf1cbdfaf348940f42abda1239dd8629bb469920638399fa714bb821", "file": "ELF 64-bit LSB x86-64, dynamically linked, not stripped", "ldd": "libpthread, libstdc++, libgcc_s, libc, libm and ld-linux only; all resolved"},
+        "source_cli_contract": "apps/fpga_sender_sim/main.cpp and README/config examples are present; usage is fpga_sender_sim CONFIG.json, so config is positional and --help is not a supported static query",
+        "numa": "UNKNOWN/MISSING: /usr/bin/numactl absent; no NUMA mapping inferred"
+      },
+      "qtpulsar2": {
+        "hostname": "qtpulsar2",
+        "python": "/usr/bin/python3 Python 3.8.10",
+        "cpu_count": 24,
+        "memory_total_bytes": 67142033408,
+        "memory_available_bytes": 46799941632,
+        "disk_available_1024_blocks": 862529480,
+        "interfaces": {"ens2np0": {"state": "UP", "mtu": 9000, "speed_mbps": 100000, "duplex": "Full", "link_detected": true}, "enp4s0": {"state": "UP"}, "enp5s0": {"state": "DOWN", "carrier": false}},
+        "sender_binary": {"path": "/home/user/wy/build-sender-staged-ablation-20260829/fpga_sender_sim", "sha256": "c804811ccf1cbdfaf348940f42abda1239dd8629bb469920638399fa714bb821", "file": "ELF 64-bit LSB x86-64, dynamically linked, not stripped", "ldd": "libpthread, libstdc++, libgcc_s, libc, libm and ld-linux only; all resolved"},
+        "source_cli_contract": "apps/fpga_sender_sim/main.cpp and README/config examples are present; usage is fpga_sender_sim CONFIG.json, so config is positional and --help is not a supported static query",
+        "numa": "UNKNOWN/MISSING: /usr/bin/numactl absent; no NUMA mapping inferred"
+      }
+    },
+    "clock": "both hosts NTPSynchronized=yes; system clock observed 2026-10-15T13:56:42 CST",
+    "sender_static_contract": ["JSON config positional argument", "schema/version and station_ids validated by binary", "source endpoint, target_gbps, paced mode and per-station statistics represented in config/output strings"],
+    "dataflow_started": false
+  },
+  "qths_pipeline_environment_supplement": {
+    "observed_utc": "2026-10-15T13:57:17+08:00",
+    "host": "qths1",
+    "toolchain": {"cmake": {"path": "/home/user/wy/tools/cmake-3.31.12/bin/cmake", "version": "3.31.12", "sha256": "d8ed20c9688adaf5ee8d387072424aa732c5f589e860347e0dfa51cca37dc863"}, "ctest": {"path": "/home/user/wy/tools/cmake-3.31.12/bin/ctest", "version": "3.31.12", "sha256": "4569f74f29abcc549e2b4bd5a4fdb755c5be4e6794e02ef4fc1d9acb8962bba9"}, "python": "Python 3.8.10", "numa_cpu_lists": {"node0": "0-11,24-35", "node1": "12-23,36-47"}},
+    "selected_build": "/home/user/wy/build-coherency-20260829-r2",
+    "executables": {
+      "rdma2dada": {"path": "/home/user/wy/build-coherency-20260829-r2/rdma2dada", "sha256": "1bcc6f4b1441a3a589be7ee9e9f366eb5960472b50ead9875547a5a94b8e12d8", "usage_observed": "--plan PLAN [--recv-wr-num N] [--poll-batch N] [--poll-cpu CPU] [--debug] [--preflight-only] [--help]"},
+      "vdif_unpack_worker": {"path": "/home/user/wy/build-coherency-20260829-r2/vdif_unpack_worker", "sha256": "d2d6faacc5efff9767d858562937d7f175dac6c6435df12e56bc8ae88bb2e823", "usage_observed": "--plan PLAN [--reorder-horizon-groups] [--ready-file PATH] [--diagnostics missing-per-second] [--pre-timeline-policy discard] [--groups-per-second] [--thread-cpus]"},
+      "pipeline_worker": {"path": "/home/user/wy/build-coherency-20260829-r2/pipeline_worker", "sha256": "a3c777820f0b1aabd623c27d1b48870fbe284b61d1423b0ade6d7099d3e78fc3", "usage_observed": "--help was treated as a referenced plan path and returned an error; runner source records PLAN [--metrics-json PATH]"},
+      "dada_db": {"path": "/home/user/psrdada/bin/dada_db", "usage_observed": "-a -b -c -d -g -h -k -l -n -p -r -u -w -z"},
+      "dada_dbnull": {"path": "/home/user/psrdada/bin/dada_dbnull", "usage_observed": "-c -k -l -v -q -x/-X -o/-O -s/-S -z/-d"},
+      "dada_dbdisk": {"path": "/home/user/psrdada/bin/dada_dbdisk", "present": true},
+      "dada_dbmem": {"present": false}
+    },
+    "psrdada": {"include": ["/home/user/psrdada/include/dada_hdu.h", "/home/user/psrdada/include/dada_client.h"], "library": "/home/user/psrdada/lib/libpsrdada.so", "residue": {"rdma2dada": false, "vdif_unpack_worker": false, "pipeline_worker": false, "dada_db": false, "semaphores": "empty", "shared_memory": "only pre-existing gdm shmid 2 and 5; untouched"}},
+    "versioned_runner_entrypoints": {"dry_run_modes": ["--dry-run", "--preflight-only"], "execution_mode": "--execute requires --qths-binary-dir, --sender-binary-dir, --observation-config and --config-compiler", "receiver": "rdma2dada --plan ... --poll-batch ... --recv-wr-num ...", "unpack": "vdif_unpack_worker --plan ... --ready-file ... with optional diagnostics/pre-timeline/thread-cpus", "gpu": "pipeline_worker PLAN --metrics-json PATH", "stop_and_metrics": "versioned supervisor writes .exit/process JSON and runner collects logs/metrics; no separate standalone stop CLI observed"},
+    "dataflow_started": false
+  },
+  "minimum_versioned_probe": {
+    "required": "A versioned host-local supervisor/probe accepting fixed argv and recording PID/PPID/PGID/SID/start identity, cgroup, readiness, exit status and disconnect/reconnect state",
+    "not_run": true,
+    "reason": "This Phase0 explicitly forbids starting a background probe; systemd-run/setsid/nohup availability and Linger=no do not prove SSH-disconnect survival"
+  },
+  "TEST_RESULT": "DIAGNOSTIC_COMPLETE",
+  "PHASE0": "PASS_WITH_UNKNOWN_DISCONNECT_SURVIVAL",
+  "CLEANUP_RESULT": "NOT_APPLICABLE",
+  "DATAFLOW": "NOT_RUN",
+  "RESULT_NOTIFICATION": "FAIL",
+  "notification": {
+    "target_thread_id": "01a090fd-55d8-7b83-9ea1-1a53eaa1b952",
+    "attempts": 2,
+    "reason": "send_message_to_thread rejected both attempts because the connector did not accept delegated authorization for the coordinator target"
+  }
+}

@@ -107,6 +107,20 @@ ctest --test-dir build-linux --output-on-failure
 
 多服务器配置、bundle 和编译器衔接测试见[配置指南](../docs/control/configuration.md)；
 控制器、store、transport 测试见[生命周期指南](../docs/control/lifecycle.md)。
+MS-07b/c 新增资源归属、进程监管、主机命令和实际流水线适配的注册测试：
+`multiserver_ownership_test`、`multiserver_processes_test`、`multiserver_host_test`、
+`multiserver_pipeline_runtime_test`、`multiserver_pipeline_compiler_test`。
+最后一项传入当前构建的真实配置编译器；其余 Linux 专用能力在 macOS 会明确跳过。
+`multiserver_disconnect_probe_test` 只测试探针自身，不等于执行远端探针。
+`multiserver_acceptance_test` 验证统一功能 runner 的调度、失败、恢复查询和清理；
+Linux sender 生命周期用例在 macOS 跳过，不能把这些 skip 当作远端通过。
+`multiserver_ipc_layout_test` 验证 ABI 报告拒绝规则；服务器还必须构建
+`psrdada_ipc_layout_probe` 并执行 `multiserver_native_ipc_layout_test`，核对实际 PSRDADA
+结构大小。这是只读检查，不创建共享内存。
+`pipeline_lifecycle_publisher_test` 只编译并验证共享 JSON 发布器的原子性、权限和
+拒绝覆盖行为，不创建数据流资源。
+`pipeline_lifecycle_hooks_test.py --deployment ABS` 另行显式启用 Linux 资源测试，
+不能混入普通离线自测。上述新增范围仍待统一服务器验收，不把本地 PASS 当作已验收。
 以下只列所复用数据面的回归调用，不代表已完成多实例集成验收。
 
 ## 单项调用

@@ -1,3 +1,4 @@
+#include "rdma_dada/control/lifecycle_json.h"
 #include "rdma_dada/config/resolved_plan_json.h"
 #include "rdma_dada/modules/vdif_unpack/atfp_block_writer.h"
 #include "rdma_dada/modules/vdif_unpack/vdif_atfp_engine.h"
@@ -42,6 +43,8 @@ namespace unpack = rdma_dada::modules::vdif_unpack;
 volatile std::sig_atomic_t stop_requested = 0;
 
 void HandleSignal(int) { stop_requested = 1; }
+
+using rdma_dada::control::PublishLifecycleJson;
 
 bool FitsSizeT(std::uint64_t value) {
     return value <= static_cast<std::uint64_t>(
@@ -190,7 +193,8 @@ struct WorkerRuntime {
           input_block_capacity(0), output_block_capacity(0),
           raw_block_sequence(0), output_eod_sent(false), transfers_started(0),
           collect_missing_per_second(false),
-          discard_before_timeline_start(false), groups_per_second(0U) {}
+          discard_before_timeline_start(false), groups_per_second(0U),
+          lifecycle_input_eod(false), lifecycle_close_ok(false) {}
 
     unpack::VdifUnpackConfig config;
     rdma_dada::PipelineConfig pipeline_config;
@@ -213,6 +217,8 @@ struct WorkerRuntime {
     bool collect_missing_per_second;
     bool discard_before_timeline_start;
     std::uint64_t groups_per_second;
+    bool lifecycle_input_eod;
+    bool lifecycle_close_ok;
     std::vector<int> thread_cpus;
 };
 
@@ -310,6 +316,8 @@ bool WriteReadyFile(const std::string& path,
            << "  \"pid\": " << static_cast<long long>(getpid()) << ",\n"
            << "  \"config_id\": \"" << plan.config_id << "\",\n"
            << "  \"geometry_id\": \"" << plan.geometry_id << "\",\n"
+           << "  \"input_key\": " << plan.source.raw_key << ",\n"
+           << "  \"output_key\": " << plan.source.compute_key << ",\n"
            << "  \"prepared_unix_ns\": "
            << ClockNanoseconds(CLOCK_REALTIME) << ",\n"
            << "  \"prepare_duration_ns\": " << prepare_duration_ns << ",\n"
@@ -510,6 +518,10 @@ int CloseTransferBody(dada_client_t* client) {
     WorkerRuntime* runtime =
         static_cast<WorkerRuntime*>(client ? client->context : NULL);
     if (!runtime) return -1;
+    // dada_client_read resets the reader after the close callback. Capture
+    // actual EOD here; a byte-limit callback alone must not claim it.
+    runtime->lifecycle_input_eod =
+        ipcbuf_eod(reinterpret_cast<ipcbuf_t*>(client->data_block)) > 0;
 
     std::string error;
     if (!runtime->failed) {
@@ -661,6 +673,7 @@ int CloseTransferBody(dada_client_t* client) {
     if (!EndOutputTransfer(runtime)) return -1;
     if (!runtime->failed) {
         multilog(runtime->log, LOG_INFO, "VDIF unpack transfer completed\n");
+        runtime->lifecycle_close_ok = true;
     }
     return runtime->failed ? -1 : 0;
 }
@@ -688,6 +701,7 @@ void PrintUsage(const char* program) {
               << " --plan resolved_observation.json"
               << " [--reorder-horizon-groups GROUPS]"
               << " [--ready-file PATH]"
+              << " [--result-json PATH]"
               << " [--diagnostics missing-per-second]"
               << " [--pre-timeline-policy discard]"
               << " [--groups-per-second GROUPS]"
@@ -699,6 +713,7 @@ void PrintUsage(const char* program) {
 int main(int argc, char** argv) {
     std::string plan_path;
     std::string ready_path;
+    std::string result_path;
     std::uint64_t reorder_horizon_groups = 0U;
     bool collect_missing_per_second = false;
     bool discard_before_timeline_start = false;
@@ -716,6 +731,9 @@ int main(int argc, char** argv) {
         } else if (option == "--ready-file" && ready_path.empty() &&
                    !value.empty()) {
             ready_path = value;
+        } else if (option == "--result-json" && result_path.empty() &&
+                   !value.empty()) {
+            result_path = value;
         } else if (option == "--reorder-horizon-groups" &&
                    reorder_horizon_groups == 0U &&
                    ParsePositiveUint64(value.c_str(),
@@ -776,6 +794,7 @@ int main(int argc, char** argv) {
     bool input_connected = false;
     bool output_connected = false;
     bool input_locked = false;
+    std::uint64_t prepare_duration = 0U;
     int result = EXIT_FAILURE;
 
     if (!input_hdu || !runtime.output_hdu) {
@@ -816,11 +835,8 @@ int main(int argc, char** argv) {
                            "cannot configure compute block writer: " + error);
         }
         const std::uint64_t prepare_end = ClockNanoseconds(CLOCK_MONOTONIC_RAW);
-        const std::uint64_t prepare_duration =
+        prepare_duration =
             prepare_end >= prepare_start ? prepare_end - prepare_start : 0U;
-        if (!runtime.failed && !WriteReadyFile(
-                ready_path, resolved_plan, runtime, prepare_duration, &error))
-            SetFailure(&runtime, error);
         if (!runtime.failed && !LockHduRead(input_hdu))
             SetFailure(&runtime, "cannot lock input DADA ring for reading");
         else if (!runtime.failed)
@@ -844,8 +860,12 @@ int main(int argc, char** argv) {
             client->header_transfer = 0;
             client->quiet = 1;
 
+            if (!WriteReadyFile(ready_path, resolved_plan, runtime,
+                                prepare_duration, &error))
+                SetFailure(&runtime, error);
+
             bool keep_running = true;
-            while (keep_running && !stop_requested) {
+            while (keep_running && !stop_requested && !runtime.failed) {
                 runtime.failed = false;
                 runtime.error.clear();
                 if (dada_client_read(client) < 0 || runtime.failed) {
@@ -890,5 +910,38 @@ int main(int argc, char** argv) {
     if (runtime.output_hdu) dada_hdu_destroy(runtime.output_hdu);
     if (input_hdu) dada_hdu_destroy(input_hdu);
     multilog_close(runtime.log);
+    const unpack::VdifAtfpStatistics& statistics = runtime.engine.statistics();
+    std::ostringstream final_result;
+    final_result << "{\"schema_version\":1,\"pid\":" << getpid()
+        << ",\"config_id\":\"" << resolved_plan.config_id
+        << "\",\"geometry_id\":\"" << resolved_plan.geometry_id
+        << "\",\"input_key\":" << resolved_plan.source.raw_key
+        << ",\"output_key\":" << resolved_plan.source.compute_key
+        << ",\"ok\":" << (result == EXIT_SUCCESS && !runtime.failed &&
+                                   runtime.lifecycle_close_ok ? "true" : "false")
+        << ",\"expected_groups\":" << resolved_plan.expected_groups
+        << ",\"emitted_bytes\":" << statistics.emitted_bytes
+        << ",\"input_eod\":" << (runtime.lifecycle_input_eod ? "true" : "false")
+        << ",\"eod\":" << (runtime.output_eod_sent ? "true" : "false")
+        << ",\"station_ids\":[";
+    for (std::size_t i = 0; i < resolved_plan.source.station_ids.size(); ++i) {
+        if (i) final_result << ',';
+        final_result << resolved_plan.source.station_ids[i];
+    }
+    final_result << "],\"station_accepted_packets\":[";
+    for (std::size_t i = 0; i < statistics.station_accepted_packets.size(); ++i) {
+        if (i) final_result << ',';
+        final_result << statistics.station_accepted_packets[i];
+    }
+    final_result << "],\"station_highest_ordinals\":[";
+    for (std::size_t i = 0; i < statistics.station_highest_ordinals.size(); ++i) {
+        if (i) final_result << ',';
+        final_result << statistics.station_highest_ordinals[i];
+    }
+    final_result << "]}\n";
+    if (!PublishLifecycleJson(result_path, final_result.str())) {
+        std::cerr << "vdif_unpack_worker: cannot publish lifecycle result file\n";
+        return EXIT_FAILURE;
+    }
     return result;
 }

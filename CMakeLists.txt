@@ -482,7 +482,8 @@ if(BUILD_TESTING)
         COMMAND packet_format_config_test
                 ${CMAKE_CURRENT_SOURCE_DIR}/config/packet_formats/frontend.example-v1.json)
     if(Python3_Interpreter_FOUND)
-        foreach(multiserver_suite model deployment weights bundle store controller transport)
+        foreach(multiserver_suite model deployment weights bundle store controller transport
+                ownership processes host pipeline_runtime disconnect_probe ipc_layout acceptance)
             add_test(
                 NAME multiserver_${multiserver_suite}_test
                 COMMAND ${Python3_EXECUTABLE} -B -m unittest discover
@@ -491,6 +492,19 @@ if(BUILD_TESTING)
             set_tests_properties(multiserver_${multiserver_suite}_test
                 PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         endforeach()
+        add_test(
+            NAME multiserver_pipeline_compiler_test
+            COMMAND ${Python3_EXECUTABLE} -B
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/multiserver_pipeline_runtime_test.py
+                    --compiler $<TARGET_FILE:observation_config_compile> -v)
+        set_tests_properties(multiserver_pipeline_compiler_test
+            PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        add_test(
+            NAME pipeline_lifecycle_publisher_test
+            COMMAND ${Python3_EXECUTABLE} -B -m unittest
+                    pipeline_lifecycle_hooks_test.PortableLifecyclePublisherTest -v)
+        set_tests_properties(pipeline_lifecycle_publisher_test
+            PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
         add_test(
             NAME multiserver_compiler_unit_test
             COMMAND ${Python3_EXECUTABLE} -B
@@ -846,6 +860,17 @@ if(BUILD_RDMA_PIPELINE)
     endif()
 
     if(BUILD_TESTING)
+        add_executable(psrdada_ipc_layout_probe tests/psrdada_ipc_layout_probe.c)
+        target_link_libraries(psrdada_ipc_layout_probe PRIVATE ${PSRDADA_TARGET})
+        if(Python3_Interpreter_FOUND)
+            add_test(
+                NAME multiserver_native_ipc_layout_test
+                COMMAND ${Python3_EXECUTABLE} -B
+                        ${CMAKE_CURRENT_SOURCE_DIR}/tests/multiserver_ipc_layout_test.py
+                        --probe $<TARGET_FILE:psrdada_ipc_layout_probe> -v)
+            set_tests_properties(multiserver_native_ipc_layout_test PROPERTIES
+                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        endif()
         add_executable(dada_header_roundtrip_test
             tests/dada_header_roundtrip_test.cpp)
         target_link_libraries(dada_header_roundtrip_test
